@@ -11,8 +11,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 		.tc(Timecontrol::default())
 	;
 	
-	println!("go job {:?}", go_job);
-	
 	let mut uciengine = UciEngine::new("./stockfish12".to_string());
 	
 	let result = uciengine.go(go_job).await?;
