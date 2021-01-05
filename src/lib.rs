@@ -19,6 +19,7 @@
 //!		.uci_opt("Hash", 128)
 //!		.uci_opt("Threads", 4)
 //!		.pos_fen("k7/8/8/8/8/8/R7/7K w - - 0 1")
+//!		.pos_moves("h1h2")
 //!		.tc(Timecontrol{
 //!			wtime: 15000,
 //!			winc: 0,
