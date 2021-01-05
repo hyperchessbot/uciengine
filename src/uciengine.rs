@@ -1,3 +1,5 @@
+use log::{debug, log_enabled, info, Level};
+
 use tokio::process::Command;
 use tokio::io::{BufReader, AsyncBufReadExt, AsyncWriteExt};
 use std::process::Stdio;
@@ -148,17 +150,29 @@ impl UciEngine {
 			let status = child.await
 				.expect("child process encountered an error");
 
-			println!("child status was: {}", status);
+			if log_enabled!(Level::Debug) {
+				debug!("child exit status : {}", status);
+			}			
 		});
 
 		tokio::spawn(async {
 			match UciEngine::read_stdout(tx, reader).await {
-				Ok(result) => println!("reader ok {:?}", result),
-				Err(err) => println!("reader err {:?}", err)
+				Ok(result) => {
+					if log_enabled!(Level::Debug) {
+						debug!("reader ok {:?}", result)
+					}		
+				},
+				Err(err) => {
+					if log_enabled!(Level::Debug) {
+						debug!("reader err {:?}", err)
+					}		
+				}
 			}
 		});
-
-		println!("spawned uci engine : {}", path);
+		
+		if log_enabled!(Level::Info) {
+			info!("spawned uci engine : {}", path);
+		}		
 		
 		UciEngine {
 			path: path,
@@ -173,7 +187,10 @@ impl UciEngine {
 		mut reader: tokio::io::Lines<tokio::io::BufReader<tokio::process::ChildStdout>>
 	) -> Result<(), Box<dyn std::error::Error>> {
 		while let Some(line) = reader.next_line().await? {
-			println!("engine out : {}", line);
+			if log_enabled!(Level::Info) {
+				info!("uci engine out : {}", line);
+			}	
+			
 			if line.len() >= 8 {
 				if &line[0..8] == "bestmove" {
 					let _ = tx.send(line);					
@@ -186,9 +203,15 @@ impl UciEngine {
 
 	/// issue uci command, used internally
 	async fn issue_command(&mut self, command: String) -> Result<(), Box<dyn std::error::Error>> {
-		println!("issuing uci command : {}", command);
+		if log_enabled!(Level::Info) {
+			info!("issuing uci command : {}", command);
+		}
 		
-		let _ = self.stdin.write_all(format!("{}\n", command).as_bytes()).await?;
+		let result = self.stdin.write_all(format!("{}\n", command).as_bytes()).await?;
+		
+		if log_enabled!(Level::Debug) {
+			debug!("issue uci command result : {:?}", result);
+		}
 
 		Ok(())
 	}
@@ -196,7 +219,11 @@ impl UciEngine {
 	/// start thinking based on go job and return result, blocking
 	pub async fn go(&mut self, go_job: GoJob) -> Result<GoResult, Box<dyn std::error::Error>> {
 		for (key, value) in go_job.uci_options {
-			self.issue_command(format!("setoption name {} value {}", key, value).to_string()).await?;
+			let result = self.issue_command(format!("setoption name {} value {}", key, value).to_string()).await;
+			
+			if log_enabled!(Level::Debug) {
+				debug!("issue uci option command result : {:?}", result);
+			}
 		}
 		
 		let pos_command:String = match go_job.position {
@@ -206,7 +233,11 @@ impl UciEngine {
 			FenAndMovesStr{ fen, moves_str } => format!("position fen {} moves {}", fen, moves_str),
 		};
 		
-		let _ = self.issue_command(pos_command).await?;
+		let result = self.issue_command(pos_command).await;
+		
+		if log_enabled!(Level::Debug) {
+			debug!("issue position command result : {:?}", result);
+		}
 		
 		let mut go_command = "go".to_string();
 		
@@ -214,9 +245,17 @@ impl UciEngine {
 			go_command = go_command + &format!(" {} {}", key, value);
 		}
 		
-		let _ = self.issue_command(go_command).await?;
+		let result = self.issue_command(go_command).await;
+		
+		if log_enabled!(Level::Debug) {
+			debug!("issue go command result : {:?}", result);
+		}
 		
 		let result = self.rx.recv();
+		
+		if log_enabled!(Level::Debug) {
+			debug!("recv bestmove result : {:?}", result);
+		}
 		
 		let mut bestmove:Option<String> = None;
 		let mut ponder:Option<String> = None;
