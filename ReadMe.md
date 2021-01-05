@@ -5,11 +5,18 @@ Rust uci engine wrapper.
 # Usage
 
 ```rust
+#[macro_use]
+extern crate log;
+
 use uciengine::uciengine::*;
 use uciengine::uciengine::Position::*;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
+	env_logger::init();
+	
+	info!("starting up");
+	
 	let go_job = GoJob::new()				
 		.uci_opt("UCI_Variant".to_string(), "atomic".to_string())
 		.uci_opt("Hash".to_string(), "128".to_string())
@@ -34,6 +41,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 	
 	Ok(())
 }
+
 ```
 
 # Logging
