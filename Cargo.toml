@@ -1,6 +1,6 @@
 [package]
 name = "uciengine"
-version = "0.1.0"
+version = "0.1.1"
 authors = ["hyperchessbot <hyperchessbot@gmail.com>"]
 edition = "2018"
 keywords = ["uci", "chess", "engine", "wrapper"]
@@ -8,7 +8,7 @@ description = "Use chess engine wrapper supporting uci command necessary for pla
 license = "MIT"
 repository = "https://github.com/hyperchessbot/uciengine"
 homepage = "https://github.com/hyperchessbot/uciengine#uciengine"
-documentation = "https://docs.rs/uciengine/0.1.0"
+documentation = "https://docs.rs/uciengine/0.1.1"
 readme = "ReadMe.md"
 
 [dependencies]
