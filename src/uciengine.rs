@@ -7,21 +7,6 @@ use std::sync::mpsc::{Sender, Receiver};
 use std::sync::mpsc;
 use std::collections::HashMap;
 
-/// position
-#[derive(Debug)]
-pub enum Position {
-	/// set up position from fen
-	Fen { fen: String },
-	/// set up position from fen and uci move list as string
-	FenAndMovesStr { fen: String, moves_str: String },
-	/// set up position from startpos
-	Startpos,
-	/// set up position from startpos and uci move list as string
-	StartposAndMovesStr { moves_str: String },
-}
-
-use Position::*;
-
 /// uci engine
 #[derive(Debug)]
 pub struct UciEngine {
@@ -33,13 +18,27 @@ pub struct UciEngine {
 	rx: Receiver<String>,
 }
 
+/// enum of possible position sepcifiers
+#[derive(Debug)]
+pub enum PosSpec{
+	Startpos,
+	Fen,
+	No
+}
+
+use PosSpec::*;
+
 /// go command job
 #[derive(Debug)]
 pub struct GoJob {
 	/// uci options as key value pairs
 	uci_options: HashMap<String, String>,
-	/// position setup
-	position: Position,
+	/// position specifier
+	pos_spec: PosSpec,
+	/// position fen
+	pos_fen: Option<String>,
+	/// position moves
+	pos_moves: Option<String>,
 	/// go command options as key value pairs
 	go_options: HashMap<String, String>,
 }
@@ -76,22 +75,34 @@ impl GoJob {
 	/// create new GoJob with reasonable defaults
 	pub fn new() -> GoJob {
 		GoJob {
-			position: Startpos,
+			pos_spec: No,
+			pos_fen: None,
+			pos_moves: None,
 			uci_options: HashMap::new(),
 			go_options: HashMap::new(),
 		}
 	}
 	
-	/// set position and return self
-	pub fn pos(mut self, pos: Position) -> GoJob {
-		self.position = pos;
+	/// set position fen and return self
+	pub fn pos_fen<T>(mut self, fen: T) -> GoJob where
+	T: core::fmt::Display {
+		self.pos_spec = Fen;
+		self.pos_fen = Some(format!("{}", fen).to_string());
+		
+		self
+	}
+	
+	/// set position startpos and return self
+	pub fn pos_startpos(mut self) -> GoJob {
+		self.pos_spec = Startpos;
 		
 		self
 	}
 	
 	/// set uci option as key value pair and return self
-	pub fn uci_opt(mut self, key:String, value:String) -> GoJob {
-		self.uci_options.insert(key, value);
+	pub fn uci_opt<K,V>(mut self, key:K, value:V) -> GoJob where
+	K: core::fmt::Display, V: core::fmt::Display {
+		self.uci_options.insert(format!("{}",key), format!("{}", value));
 		
 		self
 	}
@@ -127,7 +138,10 @@ pub struct GoResult {
 impl UciEngine {
 	/// create new uci engine and spawn it
 	/// path should hold command path, example `./stockfish12`
-	pub fn new(path: String) -> UciEngine {		
+	pub fn new<T>(path: T) -> UciEngine where
+	T: core::fmt::Display {		
+		let path = format!("{}", path);
+		
 		let mut cmd = Command::new(path.as_str());
 		
 		cmd.stdout(Stdio::piped());
@@ -226,17 +240,24 @@ impl UciEngine {
 			}
 		}
 		
-		let pos_command:String = match go_job.position {
-			Startpos => "position startpos".to_string(),
-			Fen{ fen } => format!("position fen {}", fen),
-			StartposAndMovesStr{ moves_str } => format!("position startpos moves {}", moves_str),
-			FenAndMovesStr{ fen, moves_str } => format!("position fen {} moves {}", fen, moves_str),
+		let mut pos_command_moves = "".to_string();
+		
+		if let Some(pos_moves) = go_job.pos_moves {
+			pos_command_moves = format!(" moves {}", pos_moves)
+		}
+		
+		let pos_command:Option<String> = match go_job.pos_spec {
+			Startpos => Some(format!("position startpos{}", pos_command_moves)),
+			Fen => Some(format!("position fen {}{}", go_job.pos_fen.unwrap(), pos_command_moves)),
+			_ => None
 		};
 		
-		let result = self.issue_command(pos_command).await;
+		if let Some(pos_command) = pos_command {
+			let result = self.issue_command(pos_command).await;
 		
-		if log_enabled!(Level::Debug) {
-			debug!("issue position command result : {:?}", result);
+			if log_enabled!(Level::Debug) {
+				debug!("issue position command result : {:?}", result);
+			}
 		}
 		
 		let mut go_command = "go".to_string();
