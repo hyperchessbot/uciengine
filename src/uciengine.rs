@@ -46,13 +46,13 @@ pub struct GoJob {
 #[derive(Debug)]
 pub struct Timecontrol {
 	/// white time
-	wtime: usize,
+	pub wtime: usize,
 	/// white increment
-	winc: usize,
+	pub winc: usize,
 	/// black time
-	btime: usize,
+	pub btime: usize,
 	/// black increment
-	binc: usize,
+	pub binc: usize,
 }
 
 /// implementation of time control
