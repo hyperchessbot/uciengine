@@ -1,3 +1,8 @@
+//!
+//! # Examples
+//!
+//!
+//!```
 //!#[macro_use]
 //!extern crate log;
 //!
@@ -30,7 +35,8 @@
 //!	
 //!	Ok(())
 //!}
-//!
+//!```
+
 
 // lib
 pub mod uciengine;

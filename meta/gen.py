@@ -18,7 +18,8 @@ def decorate(text, pre):
 example = read_file("src/example.rs")
 parts = read_file("src/lib.rs").split("// lib\n")
 
-lib = decorate(example, "//!") + "\n\n// lib\n" + parts[1]
+lib = "//!\n//! # Examples\n//!\n//!\n//!```\n"
+lib = lib + decorate(example, "//!") + "```\n\n\n// lib\n" + parts[1]
 # print(lib)
 write_file("src/lib.rs", lib)
 
