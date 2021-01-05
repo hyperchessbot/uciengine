@@ -5,6 +5,17 @@ use std::sync::mpsc::{Sender, Receiver};
 use std::sync::mpsc;
 use std::collections::HashMap;
 
+/// position
+#[derive(Debug)]
+pub enum Position {
+	Fen { fen: String },
+	FenAndMovesStr { fen: String, moves_str: String },
+	Startpos,
+	StartposAndMovesStr { moves_str: String },
+}
+
+use Position::*;
+
 /// uci engine
 #[derive(Debug)]
 pub struct UciEngine {
@@ -16,6 +27,7 @@ pub struct UciEngine {
 /// go command job
 #[derive(Debug)]
 pub struct GoJob {
+	position: Position,
 	uci_options: HashMap<String, String>,
 	go_options: HashMap<String, String>,
 }
@@ -39,9 +51,16 @@ impl Timecontrol {
 impl GoJob {
 	pub fn new() -> GoJob {
 		GoJob {
+			position: Startpos,
 			uci_options: HashMap::new(),
 			go_options: HashMap::new(),
 		}
+	}
+	
+	pub fn pos(mut self, pos: Position) -> GoJob {
+		self.position = pos;
+		
+		self
 	}
 	
 	pub fn uci_opt(mut self, key:String, value:String) -> GoJob {
@@ -148,6 +167,15 @@ impl UciEngine {
 		for (key, value) in go_job.uci_options {
 			self.issue_command(format!("setoption name {} value {}", key, value).to_string()).await?;
 		}
+		
+		let pos_command:String = match go_job.position {
+			Startpos => "position startpos".to_string(),
+			Fen{ fen } => format!("position fen {}", fen),
+			StartposAndMovesStr{ moves_str } => format!("position startpos moves {}", moves_str),
+			FenAndMovesStr{ fen, moves_str } => format!("position fen {} moves {}", fen, moves_str),
+		};
+		
+		let _ = self.issue_command(pos_command).await?;
 		
 		let mut go_command = "go".to_string();
 		
