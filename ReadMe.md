@@ -1,5 +1,7 @@
 # uciengine
 
+[![documentation](https://docs.rs/uciengine/badge.svg)](https://docs.rs/uciengine) [![Crates.io](https://img.shields.io/crates/v/uciengine.svg)](https://crates.io/crates/uciengine) [![Crates.io (recent)](https://img.shields.io/crates/dr/uciengine)](https://crates.io/crates/uciengine)
+
 Rust uci engine wrapper.
 
 # Usage
