@@ -3,11 +3,11 @@ use uciengine::uciengine::Position::*;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-	let go_job = GoJob::new()		
-		.pos(FenAndMovesStr{ fen: "k7/8/8/8/8/8/R7/7K w - - 0 1".to_string(), moves_str: "h1h2".to_string() })
+	let go_job = GoJob::new()				
 		.uci_opt("UCI_Variant".to_string(), "atomic".to_string())
 		.uci_opt("Hash".to_string(), "128".to_string())
 		.uci_opt("Threads".to_string(), "4".to_string())
+		.pos(FenAndMovesStr{ fen: "k7/8/8/8/8/8/R7/7K w - - 0 1".to_string(), moves_str: "h1h2".to_string() })
 		.tc(Timecontrol::default())
 	;
 	
