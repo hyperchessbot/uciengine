@@ -99,6 +99,14 @@ impl GoJob {
 		self
 	}
 	
+	/// set position moves and return self
+	pub fn pos_moves<T>(mut self, moves: T) -> GoJob where
+	T: core::fmt::Display {
+		self.pos_moves = Some(format!("{}", moves));
+		
+		self
+	}
+	
 	/// set uci option as key value pair and return self
 	pub fn uci_opt<K,V>(mut self, key:K, value:V) -> GoJob where
 	K: core::fmt::Display, V: core::fmt::Display {
