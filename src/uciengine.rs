@@ -4,7 +4,7 @@ pub struct UciEngine {
 }
 
 impl UciEngine {
-	fn new(set_path: String) -> UciEngine {
+	pub fn new(set_path: String) -> UciEngine {
 		UciEngine {
 			path: set_path
 		}

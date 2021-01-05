@@ -1,10 +1,8 @@
 use uciengine::uciengine::*;
 
 #[tokio::main]
-pub async fn main() -> Result<(), Box<dyn std::error::Error>> {
-	let uciengine = UciEngine::new("stockfish12")
+async fn main() {
+	let uciengine = UciEngine::new("stockfish12".to_string());
 	
-	println!("{}", uciengine);
-	
-	Ok(())
+	println!("{:?}", uciengine);
 }
