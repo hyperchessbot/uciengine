@@ -8,9 +8,13 @@ use std::collections::HashMap;
 /// position
 #[derive(Debug)]
 pub enum Position {
+	/// set up position from fen
 	Fen { fen: String },
+	/// set up position from fen and uci move list as string
 	FenAndMovesStr { fen: String, moves_str: String },
+	/// set up position from startpos
 	Startpos,
+	/// set up position from startpos and uci move list as string
 	StartposAndMovesStr { moves_str: String },
 }
 
@@ -19,36 +23,55 @@ use Position::*;
 /// uci engine
 #[derive(Debug)]
 pub struct UciEngine {
+	/// command path, example `./stockfish`
 	path: String,
+	/// handle to process stdin, used internally
 	stdin: tokio::process::ChildStdin,
+	/// receiver for bestmove, used internally
 	rx: Receiver<String>,
 }
 
 /// go command job
 #[derive(Debug)]
 pub struct GoJob {
-	position: Position,
+	/// uci options as key value pairs
 	uci_options: HashMap<String, String>,
+	/// position setup
+	position: Position,
+	/// go command options as key value pairs
 	go_options: HashMap<String, String>,
 }
 
 /// time control
 #[derive(Debug)]
 pub struct Timecontrol {
-	wtime: usize, winc: usize, btime: usize, binc: usize,
+	/// white time
+	wtime: usize,
+	/// white increment
+	winc: usize,
+	/// black time
+	btime: usize,
+	/// black increment
+	binc: usize,
 }
 
 /// implementation of time control
 impl Timecontrol {
+	/// create default time control
+	/// one minute thinking time for both sides, no increment
 	pub fn default() -> Timecontrol {
 		Timecontrol {
-			wtime: 60000, winc: 0, btime: 60000, binc: 0,
+			wtime: 60000,
+			winc: 0,
+			btime: 60000,
+			binc: 0,
 		}
 	}
 }
 
 /// go command job implementation
 impl GoJob {
+	/// create new GoJob with reasonable defaults
 	pub fn new() -> GoJob {
 		GoJob {
 			position: Startpos,
@@ -57,24 +80,28 @@ impl GoJob {
 		}
 	}
 	
+	/// set position and return self
 	pub fn pos(mut self, pos: Position) -> GoJob {
 		self.position = pos;
 		
 		self
 	}
 	
+	/// set uci option as key value pair and return self
 	pub fn uci_opt(mut self, key:String, value:String) -> GoJob {
 		self.uci_options.insert(key, value);
 		
 		self
 	}
 	
+	/// set go option as key value pair and return self
 	pub fn go_opt(mut self, key:String, value:String) -> GoJob {
 		self.go_options.insert(key, value);
 		
 		self
 	}
 	
+	/// set time control and return self
 	pub fn tc(mut self, tc: Timecontrol) -> GoJob {
 		self.go_options.insert("wtime".to_string(), format!("{}", tc.wtime));
 		self.go_options.insert("winc".to_string(),  format!("{}", tc.winc));
@@ -88,12 +115,16 @@ impl GoJob {
 /// go command result
 #[derive(Debug)]
 pub struct GoResult {
+	/// best move if any
 	bestmove: Option<String>,
+	/// ponder if any
 	ponder: Option<String>,
 }
 
 /// uci engine implementation
 impl UciEngine {
+	/// create new uci engine and spawn it
+	/// path should hold command path, example `./stockfish12`
 	pub fn new(path: String) -> UciEngine {		
 		let mut cmd = Command::new(path.as_str());
 		
@@ -127,7 +158,7 @@ impl UciEngine {
 			}
 		});
 
-		println!("spawned uci engine {}", path);
+		println!("spawned uci engine : {}", path);
 		
 		UciEngine {
 			path: path,
@@ -136,33 +167,33 @@ impl UciEngine {
 		}
 	}
 	
-	pub async fn read_stdout(
+	/// read engine stdout, used internally
+	async fn read_stdout(
 		tx: Sender<String>,
 		mut reader: tokio::io::Lines<tokio::io::BufReader<tokio::process::ChildStdout>>
 	) -> Result<(), Box<dyn std::error::Error>> {
 		while let Some(line) = reader.next_line().await? {
-			println!("Line: {}", line);
+			println!("engine out : {}", line);
 			if line.len() >= 8 {
 				if &line[0..8] == "bestmove" {
-					let send_result = tx.send(line);
-					println!("send result {:?}", send_result);
+					let _ = tx.send(line);					
 				}	
 			}
 		}
 
 		Ok(())
 	}
+
+	/// issue uci command, used internally
+	async fn issue_command(&mut self, command: String) -> Result<(), Box<dyn std::error::Error>> {
+		println!("issuing uci command : {}", command);
 		
-	pub async fn issue_command(&mut self, command: String) -> Result<(), Box<dyn std::error::Error>> {
-		println!("issuing command {}", command);
-		
-		let result = self.stdin.write_all(format!("{}\n", command).as_bytes()).await?;
-		
-		println!("issue command result {:?}", result);
+		let _ = self.stdin.write_all(format!("{}\n", command).as_bytes()).await?;
 
 		Ok(())
 	}
 	
+	/// start thinking based on go job and return result, blocking
 	pub async fn go(&mut self, go_job: GoJob) -> Result<GoResult, Box<dyn std::error::Error>> {
 		for (key, value) in go_job.uci_options {
 			self.issue_command(format!("setoption name {} value {}", key, value).to_string()).await?;
@@ -186,8 +217,6 @@ impl UciEngine {
 		let _ = self.issue_command(go_command).await?;
 		
 		let result = self.rx.recv();
-		
-		println!("go command result {:?}", result);
 		
 		let mut bestmove:Option<String> = None;
 		let mut ponder:Option<String> = None;
