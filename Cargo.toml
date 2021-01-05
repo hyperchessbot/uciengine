@@ -1,0 +1,24 @@
+[package]
+name = "uciengine"
+version = "0.1.0"
+authors = ["hyperchessbot <hyperchessbot@gmail.com>"]
+edition = "2018"
+keywords = ["uci", "chess", "engine", "wrapper"]
+description = "Use chess engine wrapper supporting uci command necessary for playing a game. Analysis is not supported."
+license = "MIT"
+repository = "https://github.com/hyperchessbot/uciengine"
+homepage = "https://github.com/hyperchessbot/uciengine#uciengine"
+documentation = "https://docs.rs/uciengine/0.1.0"
+readme = "ReadMe.md"
+
+[dependencies]
+
+[dependencies.tokio]
+version = "0.2.22"
+features = ["full"]
+
+[[bin]]
+name = "example"
+path = "src/example.rs"
+
+[lib]
