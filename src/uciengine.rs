@@ -248,18 +248,20 @@ impl UciEnginePool {
 		let stdin = child.stdin.take()
 			.expect("child did not have a handle to stdin");
 		
-		self.stdins.push(stdin);
+		//self.stdins.push(stdin);
 		
-		let handle = self.stdins.len() - 1;
+		
 		
 		let reader = BufReader::new(stdout).lines();
 		
 		let (tx, rx):(Sender<String>, Receiver<String>) = mpsc::channel();
 		
 		self.rxs.push(rx);
+		
+		let handle = self.rxs.len() - 1;
 
-		tokio::spawn(async {
-			let status = child.await
+		tokio::spawn(async move {
+			let status = child.wait().await
 				.expect("child process encountered an error");
 
 			if log_enabled!(Level::Debug) {
@@ -288,13 +290,16 @@ impl UciEnginePool {
 		
 		self.go_job_queues.push(go_job_queue);
 		
-		std::thread::spawn(move || {				
-			while let Some(go_job) = clone.wait_for_go_job() {
-				println!("{} dequeued {:?}", handle, go_job)
-			}
-			// we get here once we receive a None from the queue
-			println!("{} queue ended", handle);
-		});
+tokio::spawn(async move {				
+	let mut stdin = stdin;
+	let result = stdin.write_all(b"go depth 5\n").await;
+	let result = tokio::time::sleep(tokio::time::Duration::from_secs(15)).await;
+	/*while let Some(go_job) = clone.wait_for_go_job() {
+		println!("{} dequeued {:?}", handle, go_job)
+	}*/
+	// we get here once we receive a None from the queue
+	println!("{} queue ended", handle);
+});
 				
 		if log_enabled!(Level::Info) {
 			info!("spawned uci engine : {}", path);
