@@ -4,6 +4,7 @@ use tokio::process::Command;
 use tokio::io::{BufReader, AsyncBufReadExt, AsyncWriteExt};
 use std::process::Stdio;
 use std::collections::HashMap;
+use tokio::sync::mpsc::{Sender, Receiver};
 
 /// enum of possible position sepcifiers
 #[derive(Debug)]
@@ -32,7 +33,7 @@ pub struct GoJob {
 	/// go command options as key value pairs
 	go_options: HashMap<String, String>,
 	/// result sender
-	rtx: Option<tokio::sync::mpsc::Sender<GoResult>>,
+	rtx: Option<Sender<GoResult>>,
 }
 
 /// time control
@@ -193,7 +194,7 @@ impl UciEnginePool {
 	
 	/// read stdout of engine process
 	async fn read_stdout(
-		tx: tokio::sync::mpsc::Sender<String>,
+		tx: Sender<String>,
 		mut reader: tokio::io::Lines<tokio::io::BufReader<tokio::process::ChildStdout>>
 	) -> Result<(), Box<dyn std::error::Error>> {
 		while let Some(line) = reader.next_line().await? {
@@ -233,7 +234,7 @@ impl UciEnginePool {
 		
 		let reader = BufReader::new(stdout).lines();
 		
-		let (tx, rx):(tokio::sync::mpsc::Sender<String>, tokio::sync::mpsc::Receiver<String>) = tokio::sync::mpsc::channel(1);
+		let (tx, rx):(Sender<String>, Receiver<String>) = tokio::sync::mpsc::channel(1);
 		
 		tokio::spawn(async move {
 			let status = child.wait().await
@@ -293,9 +294,9 @@ impl UciEnginePool {
 	}
 	
 	/// enqueue go job
-	pub fn enqueue_go_job(&mut self, handle: usize, go_job: GoJob) -> tokio::sync::mpsc::Receiver<GoResult> {	
+	pub fn enqueue_go_job(&mut self, handle: usize, go_job: GoJob) -> Receiver<GoResult> {	
 		let mut go_job = go_job;
-		let (rtx, rrx):(tokio::sync::mpsc::Sender<GoResult>, tokio::sync::mpsc::Receiver<GoResult>) = tokio::sync::mpsc::channel(1);
+		let (rtx, rrx):(Sender<GoResult>, Receiver<GoResult>) = tokio::sync::mpsc::channel(1);
 		go_job.rtx = Some(rtx);
 		let send_result = self.gtxs[handle].send(go_job);		
 		println!("send result {:?}", send_result);
