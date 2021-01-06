@@ -33,9 +33,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 	
 	println!("result {:?}", result);*/
 	
-	pool.enqueue_go_job(engine, go_job);
+	let mut rx = pool.enqueue_go_job(engine, go_job);
 	
-	std::thread::sleep(std::time::Duration::from_millis(5000));
+	let _ = rx.recv().await;
 	
 	Ok(())
 }

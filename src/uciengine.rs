@@ -34,7 +34,7 @@ pub struct GoJob {
 	/// go command options as key value pairs
 	go_options: HashMap<String, String>,
 	/// result sender
-	rtx: Option<tokio::sync::mpsc::UnboundedSender<GoResult>>;
+	rtx: Option<tokio::sync::mpsc::Sender<GoResult>>,
 }
 
 /// time control
@@ -179,9 +179,7 @@ pub struct GoResult {
 }
 
 /// uci engine pool
-pub struct UciEnginePool {	
-	/// receivers of best move
-	rxs: Vec<Receiver<String>>,	
+pub struct UciEnginePool {		
 	/// receivers of go jobs
 	gtxs: Vec<tokio::sync::mpsc::UnboundedSender<GoJob>>,
 }
@@ -190,15 +188,14 @@ pub struct UciEnginePool {
 impl UciEnginePool {
 	/// create new uci engine pool
 	pub fn new() -> UciEnginePool {
-		UciEnginePool {			
-			rxs: vec!(),			
+		UciEnginePool {						
 			gtxs: vec!(),
 		}
 	}
 	
 	/// read stdout of engine process
 	async fn read_stdout(
-		tx: Sender<String>,
+		tx: tokio::sync::mpsc::Sender<String>,
 		mut reader: tokio::io::Lines<tokio::io::BufReader<tokio::process::ChildStdout>>
 	) -> Result<(), Box<dyn std::error::Error>> {
 		while let Some(line) = reader.next_line().await? {
@@ -208,7 +205,8 @@ impl UciEnginePool {
 			
 			if line.len() >= 8 {
 				if &line[0..8] == "bestmove" {
-					let _ = tx.send(line);					
+					let send_result = tx.send(line).await;					
+					println!("send result {:?}", send_result);
 				}	
 			}
 		}
@@ -235,18 +233,10 @@ impl UciEnginePool {
 		let stdin = child.stdin.take()
 			.expect("child did not have a handle to stdin");
 		
-		//self.stdins.push(stdin);
-		
-		
-		
 		let reader = BufReader::new(stdout).lines();
 		
-		let (tx, rx):(Sender<String>, Receiver<String>) = mpsc::channel();
+		let (tx, rx):(tokio::sync::mpsc::Sender<String>, tokio::sync::mpsc::Receiver<String>) = tokio::sync::mpsc::channel(1);
 		
-		self.rxs.push(rx);
-		
-		let handle = self.rxs.len() - 1;
-
 		tokio::spawn(async move {
 			let status = child.wait().await
 				.expect("child process encountered an error");
@@ -275,15 +265,24 @@ impl UciEnginePool {
 		
 		self.gtxs.push(gtx);
 		
+		let handle = self.gtxs.len() - 1;
+		
 		tokio::spawn(async move {				
 			let mut stdin = stdin;
 			let mut grx = grx;
+			let mut rx = rx;
 			while let Some(go_job) = grx.recv().await {
 				println!("received go job {:?}", go_job);
 				for command in go_job.to_commands() {
 					let write_result = stdin.write_all(format!("{}\n", command).as_bytes()).await;
 					println!("write result {:?}", write_result);
 				}
+				let recv_result = rx.recv().await.unwrap();
+				println!("recv result {:?}", recv_result);
+				go_job.rtx.unwrap().send(GoResult{
+					bestmove: None,
+					ponder: None,
+				});
 			}
 		});
 				
@@ -295,7 +294,12 @@ impl UciEnginePool {
 	}
 	
 	/// enqueue go job
-	pub fn enqueue_go_job(&mut self, handle: usize, go_job: GoJob) {		
+	pub fn enqueue_go_job(&mut self, handle: usize, go_job: GoJob) -> tokio::sync::mpsc::Receiver<GoResult> {	
+		let mut go_job = go_job;
+		let (rtx, rrx):(tokio::sync::mpsc::Sender<GoResult>, tokio::sync::mpsc::Receiver<GoResult>) = tokio::sync::mpsc::channel(1);
+		go_job.rtx = Some(rtx);
 		self.gtxs[handle].send(go_job);
+		
+		rrx
 	}
 }
