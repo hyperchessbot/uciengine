@@ -179,7 +179,7 @@ pub struct GoResult {
 
 /// uci engine pool
 pub struct UciEnginePool {		
-	/// receivers of go jobs
+	/// senders of go jobs
 	gtxs: Vec<tokio::sync::mpsc::UnboundedSender<GoJob>>,
 }
 
@@ -205,7 +205,10 @@ impl UciEnginePool {
 			if line.len() >= 8 {
 				if &line[0..8] == "bestmove" {
 					let send_result = tx.send(line).await;					
-					println!("send result {:?}", send_result);
+					
+					if log_enabled!(Level::Debug) {
+						debug!("send bestmove result {:?}", send_result);
+					}
 				}	
 			}
 		}
@@ -271,26 +274,50 @@ impl UciEnginePool {
 			let mut grx = grx;
 			let mut rx = rx;
 			while let Some(go_job) = grx.recv().await {
-				println!("received go job {:?}", go_job);
-				for command in go_job.to_commands() {
-					let write_result = stdin.write_all(format!("{}\n", command).as_bytes()).await;
-					println!("write result {:?}", write_result);
+				if log_enabled!(Level::Debug) {
+					debug!("received go job {:?}", go_job);
 				}
+				
+				for command in go_job.to_commands() {
+					let command = format!("{}\n", command);
+					
+					if log_enabled!(Level::Debug) {
+						debug!("issuing engine command {}", command);
+					}
+					
+					let write_result = stdin.write_all(command.as_bytes()).await;
+					
+					if log_enabled!(Level::Debug) {
+						debug!("write result {:?}", write_result);
+					}
+				}
+				
 				let recv_result = rx.recv().await.unwrap();
-				println!("recv result {:?}", recv_result);
+				
+				if log_enabled!(Level::Debug) {
+					debug!("recv result {:?}", recv_result);
+				}
+				
 				let parts:Vec<&str> = recv_result.split(" ").collect();
+				
 				let mut go_result = GoResult{
 					bestmove: None,
 					ponder: None,
 				};
+				
 				if parts.len() > 1 {
 					go_result.bestmove = Some(parts[1].to_string());
 				}
+				
 				if parts.len() > 3 {
 					go_result.ponder = Some(parts[3].to_string());
 				}
+				
 				let send_result = go_job.rtx.unwrap().send(go_result).await;
-				println!("send result {:?}", send_result);
+				
+				if log_enabled!(Level::Debug) {
+					debug!("result of send go result {:?}", send_result);
+				}
 			}
 		});
 				
@@ -304,10 +331,16 @@ impl UciEnginePool {
 	/// enqueue go job
 	pub fn enqueue_go_job(&mut self, handle: usize, go_job: GoJob) -> Receiver<GoResult> {	
 		let mut go_job = go_job;
+		
 		let (rtx, rrx):(Sender<GoResult>, Receiver<GoResult>) = tokio::sync::mpsc::channel(1);
+		
 		go_job.rtx = Some(rtx);
+		
 		let send_result = self.gtxs[handle].send(go_job);		
-		println!("send result {:?}", send_result);
+		
+		if log_enabled!(Level::Debug) {
+			debug!("send go job result {:?}", send_result);
+		}
 		
 		rrx
 	}

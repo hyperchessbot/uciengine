@@ -31,14 +31,18 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 			binc: 0
 		})
 	;
+	
+	println!("commands {:?}", go_job.to_commands());
 		
 	let mut pool = UciEnginePool::new();
 	
 	let engine = pool.create_engine("./stockfish12");
 	
-	let result = pool.go(engine, go_job).await?;
+	let mut rx = pool.enqueue_go_job(engine, go_job);
 	
-	println!("result {:?}", result);
+	let go_result = rx.recv().await;
+	
+	println!("go result {:?}", go_result);
 	
 	Ok(())
 }
