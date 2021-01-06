@@ -193,7 +193,9 @@ pub struct UciEnginePool {
 	/// standard inputs of engine processes
 	stdins: Vec<tokio::process::ChildStdin>,
 	/// receivers of best move
-	rxs: Vec<Receiver<String>>,	
+	rxs: Vec<Receiver<String>>,
+	/// go job queues
+	go_job_queues: Vec<std::sync::Arc<GoJobQueue>>,
 }
 
 /// uci engine pool implementation
@@ -203,6 +205,7 @@ impl UciEnginePool {
 		UciEnginePool {
 			stdins: vec!(),
 			rxs: vec!(),
+			go_job_queues: vec!(),
 		}
 	}
 	
@@ -278,12 +281,31 @@ impl UciEnginePool {
 				}
 			}
 		});
+		
+		let go_job_queue = std::sync::Arc::new(GoJobQueue::new());
+		
+		let clone = go_job_queue.clone();
+		
+		self.go_job_queues.push(go_job_queue);
+		
+		std::thread::spawn(move || {				
+			while let Some(go_job) = clone.wait_for_go_job() {
+				println!("{} dequeued {:?}", handle, go_job)
+			}
+			// we get here once we receive a None from the queue
+			println!("{} queue ended", handle);
+		});
 				
 		if log_enabled!(Level::Info) {
 			info!("spawned uci engine : {}", path);
 		}		
 		
 		handle
+	}
+	
+	/// enqueue go job
+	pub fn enqueue_go_job(&mut self, handle: usize, go_job: GoJob) {		
+		self.go_job_queues[handle].enqueue_go_job(go_job);
 	}
 	
 	/// issue engine command

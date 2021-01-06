@@ -27,9 +27,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 	
 	let engine = pool.create_engine("./stockfish12");
 	
-	let result = pool.go(engine, go_job).await?;
+	/*let result = pool.go(engine, go_job).await?;
 	
-	println!("result {:?}", result);
+	println!("result {:?}", result);*/
+	
+	pool.enqueue_go_job(engine, go_job);
+	
+	std::thread::sleep(std::time::Duration::from_millis(3000));
 	
 	Ok(())
 }
