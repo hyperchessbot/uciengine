@@ -7,14 +7,18 @@ use std::sync::mpsc::{Sender, Receiver};
 use std::sync::mpsc;
 use std::collections::HashMap;
 
+/// https://www.poor.dev/posts/what-job-queue/
 use ::std::collections::VecDeque;
 use ::std::sync::{Condvar, Mutex};
 
 /// enum of possible position sepcifiers
 #[derive(Debug)]
 pub enum PosSpec{
+	/// starting position
 	Startpos,
+	/// position from fen
 	Fen,
+	/// position not specified
 	No
 }
 
@@ -36,7 +40,6 @@ pub struct GoJob {
 }
 
 /// go job queue
-/// https://www.poor.dev/posts/what-job-queue/
 pub struct GoJobQueue {
 	/// jobs
 	jobs: Mutex<Option<VecDeque<GoJob>>>,
@@ -46,6 +49,7 @@ pub struct GoJobQueue {
 
 /// go job queue implementation
 impl GoJobQueue {
+	/// create new go job queue
 	pub fn new() -> GoJobQueue {
 		GoJobQueue {
 			jobs: Mutex::new(Some(VecDeque::new())),
@@ -101,7 +105,7 @@ pub struct Timecontrol {
 /// implementation of time control
 impl Timecontrol {
 	/// create default time control
-	/// one minute thinking time for both sides, no increment
+	/// ( one minute thinking time for both sides, no increment )
 	pub fn default() -> Timecontrol {
 		Timecontrol {
 			wtime: 60000,
@@ -186,12 +190,15 @@ pub struct GoResult {
 
 /// uci engine pool
 pub struct UciEnginePool {
+	/// standard inputs of engine processes
 	stdins: Vec<tokio::process::ChildStdin>,
+	/// receivers of best move
 	rxs: Vec<Receiver<String>>,	
 }
 
 /// uci engine pool implementation
 impl UciEnginePool {
+	/// create new uci engine pool
 	pub fn new() -> UciEnginePool {
 		UciEnginePool {
 			stdins: vec!(),
