@@ -3,8 +3,6 @@ use log::{debug, log_enabled, info, Level};
 use tokio::process::Command;
 use tokio::io::{BufReader, AsyncBufReadExt, AsyncWriteExt};
 use std::process::Stdio;
-use std::sync::mpsc::{Sender, Receiver};
-use std::sync::mpsc;
 use std::collections::HashMap;
 
 /// enum of possible position sepcifiers
@@ -279,10 +277,11 @@ impl UciEnginePool {
 				}
 				let recv_result = rx.recv().await.unwrap();
 				println!("recv result {:?}", recv_result);
-				go_job.rtx.unwrap().send(GoResult{
+				let send_result = go_job.rtx.unwrap().send(GoResult{
 					bestmove: None,
 					ponder: None,
-				});
+				}).await;
+				println!("send result {:?}", send_result);
 			}
 		});
 				
@@ -298,7 +297,8 @@ impl UciEnginePool {
 		let mut go_job = go_job;
 		let (rtx, rrx):(tokio::sync::mpsc::Sender<GoResult>, tokio::sync::mpsc::Receiver<GoResult>) = tokio::sync::mpsc::channel(1);
 		go_job.rtx = Some(rtx);
-		self.gtxs[handle].send(go_job);
+		let send_result = self.gtxs[handle].send(go_job);		
+		println!("send result {:?}", send_result);
 		
 		rrx
 	}
