@@ -33,6 +33,8 @@ pub struct GoJob {
 	pos_moves: Option<String>,
 	/// go command options as key value pairs
 	go_options: HashMap<String, String>,
+	/// result sender
+	rtx: Option<tokio::sync::mpsc::UnboundedSender<GoResult>>;
 }
 
 /// time control
@@ -72,6 +74,7 @@ impl GoJob {
 			pos_moves: None,
 			uci_options: HashMap::new(),
 			go_options: HashMap::new(),
+			rtx: None,
 		}
 	}
 	
