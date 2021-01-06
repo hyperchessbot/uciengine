@@ -7,17 +7,6 @@ use std::sync::mpsc::{Sender, Receiver};
 use std::sync::mpsc;
 use std::collections::HashMap;
 
-/// uci engine
-#[derive(Debug)]
-pub struct UciEngine {
-	/// command path, example `./stockfish`
-	path: String,
-	/// handle to process stdin, used internally
-	stdin: tokio::process::ChildStdin,
-	/// receiver for bestmove, used internally
-	rx: Receiver<String>,
-}
-
 /// enum of possible position sepcifiers
 #[derive(Debug)]
 pub enum PosSpec{
@@ -142,68 +131,23 @@ pub struct GoResult {
 	ponder: Option<String>,
 }
 
-/// uci engine implementation
-impl UciEngine {
-	/// create new uci engine and spawn it
-	/// path should hold command path, example `./stockfish12`
-	pub fn new<T>(path: T) -> UciEngine where
-	T: core::fmt::Display {		
-		let path = format!("{}", path);
-		
-		let mut cmd = Command::new(path.as_str());
-		
-		cmd.stdout(Stdio::piped());
-		cmd.stdin(Stdio::piped());
-	
-		let mut child = cmd.spawn()
-        	.expect("failed to spawn command");
-		
-		let stdout = child.stdout.take()
-        	.expect("child did not have a handle to stdout");
-	
-		let stdin = child.stdin.take()
-			.expect("child did not have a handle to stdin");
-		
-		let reader = BufReader::new(stdout).lines();
-		
-		let (tx, rx):(Sender<String>, Receiver<String>) = mpsc::channel();
+/// uci engine pool
+#[derive(Debug)]
+pub struct UciEnginePool {
+	stdins: Vec<tokio::process::ChildStdin>,
+	rxs: Vec<Receiver<String>>,
+}
 
-		tokio::spawn(async {
-			let status = child.await
-				.expect("child process encountered an error");
-
-			if log_enabled!(Level::Debug) {
-				debug!("child exit status : {}", status);
-			}			
-		});
-
-		tokio::spawn(async {
-			match UciEngine::read_stdout(tx, reader).await {
-				Ok(result) => {
-					if log_enabled!(Level::Debug) {
-						debug!("reader ok {:?}", result)
-					}		
-				},
-				Err(err) => {
-					if log_enabled!(Level::Debug) {
-						debug!("reader err {:?}", err)
-					}		
-				}
-			}
-		});
-		
-		if log_enabled!(Level::Info) {
-			info!("spawned uci engine : {}", path);
-		}		
-		
-		UciEngine {
-			path: path,
-			stdin: stdin,
-			rx: rx,
+/// uci engine pool implementation
+impl UciEnginePool {
+	pub fn new() -> UciEnginePool {
+		UciEnginePool {
+			stdins: vec!(),
+			rxs: vec!(),
 		}
 	}
 	
-	/// read engine stdout, used internally
+	/// read stdout of engine process
 	async fn read_stdout(
 		tx: Sender<String>,
 		mut reader: tokio::io::Lines<tokio::io::BufReader<tokio::process::ChildStdout>>
@@ -222,14 +166,75 @@ impl UciEngine {
 
 		Ok(())
 	}
+	
+	/// create new engine and return its handle
+	pub fn create_engine<T>(&mut self, path: T) -> usize 
+	where T : core::fmt::Display {
+		let path = format!("{}", path);
+		
+		let mut cmd = Command::new(path.as_str());
+		
+		cmd.stdout(Stdio::piped());
+		cmd.stdin(Stdio::piped());
+	
+		let mut child = cmd.spawn()
+        	.expect("failed to spawn command");
+		
+		let stdout = child.stdout.take()
+        	.expect("child did not have a handle to stdout");
+	
+		let stdin = child.stdin.take()
+			.expect("child did not have a handle to stdin");
+		
+		self.stdins.push(stdin);
+		
+		let reader = BufReader::new(stdout).lines();
+		
+		let (tx, rx):(Sender<String>, Receiver<String>) = mpsc::channel();
+		
+		self.rxs.push(rx);
 
-	/// issue uci command, used internally
-	async fn issue_command(&mut self, command: String) -> Result<(), Box<dyn std::error::Error>> {
+		tokio::spawn(async {
+			let status = child.await
+				.expect("child process encountered an error");
+
+			if log_enabled!(Level::Debug) {
+				debug!("child exit status : {}", status);
+			}			
+		});
+
+		tokio::spawn(async {
+			match UciEnginePool::read_stdout(tx, reader).await {
+				Ok(result) => {
+					if log_enabled!(Level::Debug) {
+						debug!("reader ok {:?}", result)
+					}		
+				},
+				Err(err) => {
+					if log_enabled!(Level::Debug) {
+						debug!("reader err {:?}", err)
+					}		
+				}
+			}
+		});
+		
+		if log_enabled!(Level::Info) {
+			info!("spawned uci engine : {}", path);
+		}		
+		
+		self.stdins.len() - 1
+	}
+	
+	/// issue engine command
+	pub async fn issue_command<T>(&mut self, handle: usize, command: T) -> Result<(), Box<dyn std::error::Error>> 
+	where T: core::fmt::Display {
+		let command = format!("{}", command);
+		
 		if log_enabled!(Level::Info) {
 			info!("issuing uci command : {}", command);
 		}
 		
-		let result = self.stdin.write_all(format!("{}\n", command).as_bytes()).await?;
+		let result = self.stdins[handle].write_all(format!("{}\n", command).as_bytes()).await?;
 		
 		if log_enabled!(Level::Debug) {
 			debug!("issue uci command result : {:?}", result);
@@ -238,10 +243,10 @@ impl UciEngine {
 		Ok(())
 	}
 	
-	/// start thinking based on go job and return result, blocking
-	pub async fn go(&mut self, go_job: GoJob) -> Result<GoResult, Box<dyn std::error::Error>> {
+	/// start thinking based on go job and return best move and ponder if any, blocking
+	pub async fn go(&mut self, handle: usize, go_job: GoJob) -> Result<GoResult, Box<dyn std::error::Error>> {
 		for (key, value) in go_job.uci_options {
-			let result = self.issue_command(format!("setoption name {} value {}", key, value).to_string()).await;
+			let result = self.issue_command(handle, format!("setoption name {} value {}", key, value).to_string()).await;
 			
 			if log_enabled!(Level::Debug) {
 				debug!("issue uci option command result : {:?}", result);
@@ -261,7 +266,7 @@ impl UciEngine {
 		};
 		
 		if let Some(pos_command) = pos_command {
-			let result = self.issue_command(pos_command).await;
+			let result = self.issue_command(handle, pos_command).await;
 		
 			if log_enabled!(Level::Debug) {
 				debug!("issue position command result : {:?}", result);
@@ -274,13 +279,13 @@ impl UciEngine {
 			go_command = go_command + &format!(" {} {}", key, value);
 		}
 		
-		let result = self.issue_command(go_command).await;
+		let result = self.issue_command(handle, go_command).await;
 		
 		if log_enabled!(Level::Debug) {
 			debug!("issue go command result : {:?}", result);
 		}
 		
-		let result = self.rx.recv();
+		let result = self.rxs[handle].recv();
 		
 		if log_enabled!(Level::Debug) {
 			debug!("recv bestmove result : {:?}", result);

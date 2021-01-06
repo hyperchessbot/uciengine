@@ -31,10 +31,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 			binc: 0
 		})
 	;
+		
+	let mut pool = UciEnginePool::new();
 	
-	let mut uciengine = UciEngine::new("./stockfish12");
+	let engine = pool.create_engine("./stockfish12");
 	
-	let result = uciengine.go(go_job).await?;
+	let result = pool.go(engine, go_job).await?;
 	
 	println!("result {:?}", result);
 	
