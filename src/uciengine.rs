@@ -7,10 +7,6 @@ use std::sync::mpsc::{Sender, Receiver};
 use std::sync::mpsc;
 use std::collections::HashMap;
 
-/// https://www.poor.dev/posts/what-job-queue/
-use ::std::collections::VecDeque;
-use ::std::sync::{Condvar, Mutex};
-
 /// enum of possible position sepcifiers
 #[derive(Debug)]
 pub enum PosSpec{
@@ -37,56 +33,6 @@ pub struct GoJob {
 	pos_moves: Option<String>,
 	/// go command options as key value pairs
 	go_options: HashMap<String, String>,
-}
-
-/// go job queue
-pub struct GoJobQueue {
-	/// jobs
-	jobs: Mutex<Option<VecDeque<GoJob>>>,
-	/// cond var
-	cvar: Condvar,
-}
-
-/// go job queue implementation
-impl GoJobQueue {
-	/// create new go job queue
-	pub fn new() -> GoJobQueue {
-		GoJobQueue {
-			jobs: Mutex::new(Some(VecDeque::new())),
-			cvar: Condvar::new(),
-		}
-	}
-	
-	/// enqueue go job
-	pub fn enqueue_go_job(&self, go_job: GoJob) {
-		let mut jobs = self.jobs.lock().unwrap();
-		
-		if let Some(queue) = jobs.as_mut() {
-			queue.extend(vec!(go_job));
-			self.cvar.notify_all();
-		}
-	}
-	
-	/// wait for go job
-	pub fn wait_for_go_job(&self) -> Option<GoJob> {
-		let mut jobs = self.jobs.lock().unwrap();
-		
-		loop {
-			match jobs.as_mut()?.pop_front() {
-				Some(job) => return Some(job),
-				None => {
-					jobs = self.cvar.wait(jobs).unwrap()
-				}
-			}
-		}
-	}
-	
-	/// end queue
-	pub fn end(&self) {
-		let mut jobs = self.jobs.lock().unwrap();
-		*jobs = None;
-		self.cvar.notify_all();
-	}
 }
 
 /// time control
@@ -234,9 +180,7 @@ pub struct UciEnginePool {
 	/// standard inputs of engine processes
 	stdins: Vec<tokio::process::ChildStdin>,
 	/// receivers of best move
-	rxs: Vec<Receiver<String>>,
-	/// go job queues
-	go_job_queues: Vec<std::sync::Arc<GoJobQueue>>,
+	rxs: Vec<Receiver<String>>,	
 }
 
 /// uci engine pool implementation
@@ -245,8 +189,7 @@ impl UciEnginePool {
 	pub fn new() -> UciEnginePool {
 		UciEnginePool {
 			stdins: vec!(),
-			rxs: vec!(),
-			go_job_queues: vec!(),
+			rxs: vec!(),			
 		}
 	}
 	
@@ -325,21 +268,10 @@ impl UciEnginePool {
 			}
 		});
 		
-		let go_job_queue = std::sync::Arc::new(GoJobQueue::new());
-		
-		let clone = go_job_queue.clone();
-		
-		self.go_job_queues.push(go_job_queue);
-		
 		tokio::spawn(async move {				
 			let mut stdin = stdin;
 			let result = stdin.write_all(b"go depth 5\n").await;
-			let result = tokio::time::sleep(tokio::time::Duration::from_secs(15)).await;
-			/*while let Some(go_job) = clone.wait_for_go_job() {
-				println!("{} dequeued {:?}", handle, go_job)
-			}*/
-			// we get here once we receive a None from the queue
-			println!("{} queue ended", handle);
+			let result = tokio::time::sleep(tokio::time::Duration::from_secs(15)).await;			
 		});
 				
 		if log_enabled!(Level::Info) {
@@ -351,7 +283,7 @@ impl UciEnginePool {
 	
 	/// enqueue go job
 	pub fn enqueue_go_job(&mut self, handle: usize, go_job: GoJob) {		
-		self.go_job_queues[handle].enqueue_go_job(go_job);
+		
 	}
 	
 	/// issue engine command
