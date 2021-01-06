@@ -7,6 +7,9 @@ use std::sync::mpsc::{Sender, Receiver};
 use std::sync::mpsc;
 use std::collections::HashMap;
 
+use ::std::collections::VecDeque;
+use ::std::sync::{Condvar, Mutex};
+
 /// enum of possible position sepcifiers
 #[derive(Debug)]
 pub enum PosSpec{
@@ -30,6 +33,56 @@ pub struct GoJob {
 	pos_moves: Option<String>,
 	/// go command options as key value pairs
 	go_options: HashMap<String, String>,
+}
+
+/// go job queue
+/// https://www.poor.dev/posts/what-job-queue/
+pub struct GoJobQueue {
+	/// jobs
+	jobs: Mutex<Option<VecDeque<GoJob>>>,
+	/// cond var
+	cvar: Condvar,
+}
+
+/// go job queue implementation
+impl GoJobQueue {
+	pub fn new() -> GoJobQueue {
+		GoJobQueue {
+			jobs: Mutex::new(Some(VecDeque::new())),
+			cvar: Condvar::new(),
+		}
+	}
+	
+	/// enqueue go job
+	pub fn enqueue_go_job(&self, go_job: GoJob) {
+		let mut jobs = self.jobs.lock().unwrap();
+		
+		if let Some(queue) = jobs.as_mut() {
+			queue.extend(vec!(go_job));
+			self.cvar.notify_all();
+		}
+	}
+	
+	/// wait for go job
+	pub fn wait_for_go_job(&self) -> Option<GoJob> {
+		let mut jobs = self.jobs.lock().unwrap();
+		
+		loop {
+			match jobs.as_mut()?.pop_front() {
+				Some(job) => return Some(job),
+				None => {
+					jobs = self.cvar.wait(jobs).unwrap()
+				}
+			}
+		}
+	}
+	
+	/// end queue
+	pub fn end(&self) {
+		let mut jobs = self.jobs.lock().unwrap();
+		*jobs = None;
+		self.cvar.notify_all();
+	}
 }
 
 /// time control
@@ -132,10 +185,9 @@ pub struct GoResult {
 }
 
 /// uci engine pool
-#[derive(Debug)]
 pub struct UciEnginePool {
 	stdins: Vec<tokio::process::ChildStdin>,
-	rxs: Vec<Receiver<String>>,
+	rxs: Vec<Receiver<String>>,	
 }
 
 /// uci engine pool implementation
@@ -188,6 +240,8 @@ impl UciEnginePool {
 		
 		self.stdins.push(stdin);
 		
+		let handle = self.stdins.len() - 1;
+		
 		let reader = BufReader::new(stdout).lines();
 		
 		let (tx, rx):(Sender<String>, Receiver<String>) = mpsc::channel();
@@ -217,12 +271,12 @@ impl UciEnginePool {
 				}
 			}
 		});
-		
+				
 		if log_enabled!(Level::Info) {
 			info!("spawned uci engine : {}", path);
 		}		
 		
-		self.stdins.len() - 1
+		handle
 	}
 	
 	/// issue engine command
