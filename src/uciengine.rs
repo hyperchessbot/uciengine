@@ -278,10 +278,18 @@ impl UciEnginePool {
 				}
 				let recv_result = rx.recv().await.unwrap();
 				println!("recv result {:?}", recv_result);
-				let send_result = go_job.rtx.unwrap().send(GoResult{
+				let parts:Vec<&str> = recv_result.split(" ").collect();
+				let mut go_result = GoResult{
 					bestmove: None,
 					ponder: None,
-				}).await;
+				};
+				if parts.len() > 1 {
+					go_result.bestmove = Some(parts[1].to_string());
+				}
+				if parts.len() > 3 {
+					go_result.ponder = Some(parts[3].to_string());
+				}
+				let send_result = go_job.rtx.unwrap().send(go_result).await;
 				println!("send result {:?}", send_result);
 			}
 		});

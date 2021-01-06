@@ -29,13 +29,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 	
 	let engine = pool.create_engine("./stockfish12");
 	
-	/*let result = pool.go(engine, go_job).await?;
-	
-	println!("result {:?}", result);*/
-	
 	let mut rx = pool.enqueue_go_job(engine, go_job);
 	
-	let _ = rx.recv().await;
+	let go_result = rx.recv().await;
+	
+	println!("go result {:?}", go_result);
 	
 	Ok(())
 }
