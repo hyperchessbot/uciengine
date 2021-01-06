@@ -176,20 +176,20 @@ pub struct GoResult {
 }
 
 /// uci engine pool
-pub struct UciEnginePool {
-	/// standard inputs of engine processes
-	stdins: Vec<tokio::process::ChildStdin>,
+pub struct UciEnginePool {	
 	/// receivers of best move
 	rxs: Vec<Receiver<String>>,	
+	/// receivers of go jobs
+	gtxs: Vec<tokio::sync::mpsc::UnboundedSender<GoJob>>,
 }
 
 /// uci engine pool implementation
 impl UciEnginePool {
 	/// create new uci engine pool
 	pub fn new() -> UciEnginePool {
-		UciEnginePool {
-			stdins: vec!(),
+		UciEnginePool {			
 			rxs: vec!(),			
+			gtxs: vec!(),
 		}
 	}
 	
@@ -268,10 +268,20 @@ impl UciEnginePool {
 			}
 		});
 		
+		let (gtx, grx) = tokio::sync::mpsc::unbounded_channel::<GoJob>();
+		
+		self.gtxs.push(gtx);
+		
 		tokio::spawn(async move {				
 			let mut stdin = stdin;
-			let result = stdin.write_all(b"go depth 5\n").await;
-			let result = tokio::time::sleep(tokio::time::Duration::from_secs(15)).await;			
+			let mut grx = grx;
+			while let Some(go_job) = grx.recv().await {
+				println!("received go job {:?}", go_job);
+				for command in go_job.to_commands() {
+					let write_result = stdin.write_all(format!("{}\n", command).as_bytes()).await;
+					println!("write result {:?}", write_result);
+				}
+			}
 		});
 				
 		if log_enabled!(Level::Info) {
@@ -283,93 +293,6 @@ impl UciEnginePool {
 	
 	/// enqueue go job
 	pub fn enqueue_go_job(&mut self, handle: usize, go_job: GoJob) {		
-		
-	}
-	
-	/// issue engine command
-	pub async fn issue_command<T>(&mut self, handle: usize, command: T) -> Result<(), Box<dyn std::error::Error>> 
-	where T: core::fmt::Display {
-		let command = format!("{}", command);
-		
-		if log_enabled!(Level::Info) {
-			info!("issuing uci command : {}", command);
-		}
-		
-		let result = self.stdins[handle].write_all(format!("{}\n", command).as_bytes()).await?;
-		
-		if log_enabled!(Level::Debug) {
-			debug!("issue uci command result : {:?}", result);
-		}
-
-		Ok(())
-	}
-	
-	/// start thinking based on go job and return best move and ponder if any, blocking
-	pub async fn go(&mut self, handle: usize, go_job: GoJob) -> Result<GoResult, Box<dyn std::error::Error>> {
-		for (key, value) in go_job.uci_options {
-			let result = self.issue_command(handle, format!("setoption name {} value {}", key, value).to_string()).await;
-			
-			if log_enabled!(Level::Debug) {
-				debug!("issue uci option command result : {:?}", result);
-			}
-		}
-		
-		let mut pos_command_moves = "".to_string();
-		
-		if let Some(pos_moves) = go_job.pos_moves {
-			pos_command_moves = format!(" moves {}", pos_moves)
-		}
-		
-		let pos_command:Option<String> = match go_job.pos_spec {
-			Startpos => Some(format!("position startpos{}", pos_command_moves)),
-			Fen => Some(format!("position fen {}{}", go_job.pos_fen.unwrap(), pos_command_moves)),
-			_ => None
-		};
-		
-		if let Some(pos_command) = pos_command {
-			let result = self.issue_command(handle, pos_command).await;
-		
-			if log_enabled!(Level::Debug) {
-				debug!("issue position command result : {:?}", result);
-			}
-		}
-		
-		let mut go_command = "go".to_string();
-		
-		for (key, value) in go_job.go_options {
-			go_command = go_command + &format!(" {} {}", key, value);
-		}
-		
-		let result = self.issue_command(handle, go_command).await;
-		
-		if log_enabled!(Level::Debug) {
-			debug!("issue go command result : {:?}", result);
-		}
-		
-		let result = self.rxs[handle].recv();
-		
-		if log_enabled!(Level::Debug) {
-			debug!("recv bestmove result : {:?}", result);
-		}
-		
-		let mut bestmove:Option<String> = None;
-		let mut ponder:Option<String> = None;
-		
-		if let Ok(result) = result {
-			let parts:Vec<&str> = result.split(" ").collect();
-		
-			if parts.len() > 1 {
-				bestmove = Some(parts[1].to_string());
-			}
-
-			if parts.len() > 3 {
-				ponder = Some(parts[3].to_string());
-			}
-		}
-		
-		Ok(GoResult {
-			bestmove: bestmove,
-			ponder: ponder,
-		})
+		self.gtxs[handle].send(go_job);
 	}
 }

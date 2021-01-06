@@ -35,7 +35,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 	
 	pool.enqueue_go_job(engine, go_job);
 	
-	std::thread::sleep(std::time::Duration::from_millis(20000));
+	std::thread::sleep(std::time::Duration::from_millis(5000));
 	
 	Ok(())
 }
