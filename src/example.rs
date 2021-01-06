@@ -22,6 +22,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 			binc: 0
 		})
 	;
+	
+	println!("commands {:?}", go_job.to_commands());
 		
 	let mut pool = UciEnginePool::new();
 	

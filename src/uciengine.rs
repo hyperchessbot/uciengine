@@ -129,6 +129,47 @@ impl GoJob {
 		}
 	}
 	
+	/// to commands
+	pub fn to_commands(&self) -> Vec<String> {
+		let mut commands:Vec<String> = vec!();
+		
+		for (key, value) in &self.uci_options {
+			commands.push(format!("setoption name {} value {}", key, value));			
+		}
+		
+		let mut pos_command_moves = "".to_string();
+		
+		if let Some(pos_moves) = &self.pos_moves {
+			pos_command_moves = format!(" moves {}", pos_moves)
+		}
+		
+		let pos_command:Option<String> = match self.pos_spec {
+			Startpos => Some(format!("position startpos{}", pos_command_moves)),
+			Fen => {
+				let fen = match &self.pos_fen {
+					Some(fen) => fen,
+					_ => "",
+				};				
+				Some(format!("position fen {}{}", fen, pos_command_moves))
+			},
+			_ => None
+		};
+		
+		if let Some(pos_command) = pos_command {
+			commands.push(pos_command);
+		}
+		
+		let mut go_command = "go".to_string();
+		
+		for (key, value) in &self.go_options {
+			go_command = go_command + &format!(" {} {}", key, value);
+		}
+		
+		commands.push(go_command);
+		
+		commands
+	}
+	
 	/// set position fen and return self
 	pub fn pos_fen<T>(mut self, fen: T) -> GoJob where
 	T: core::fmt::Display {
@@ -290,16 +331,16 @@ impl UciEnginePool {
 		
 		self.go_job_queues.push(go_job_queue);
 		
-tokio::spawn(async move {				
-	let mut stdin = stdin;
-	let result = stdin.write_all(b"go depth 5\n").await;
-	let result = tokio::time::sleep(tokio::time::Duration::from_secs(15)).await;
-	/*while let Some(go_job) = clone.wait_for_go_job() {
-		println!("{} dequeued {:?}", handle, go_job)
-	}*/
-	// we get here once we receive a None from the queue
-	println!("{} queue ended", handle);
-});
+		tokio::spawn(async move {				
+			let mut stdin = stdin;
+			let result = stdin.write_all(b"go depth 5\n").await;
+			let result = tokio::time::sleep(tokio::time::Duration::from_secs(15)).await;
+			/*while let Some(go_job) = clone.wait_for_go_job() {
+				println!("{} dequeued {:?}", handle, go_job)
+			}*/
+			// we get here once we receive a None from the queue
+			println!("{} queue ended", handle);
+		});
 				
 		if log_enabled!(Level::Info) {
 			info!("spawned uci engine : {}", path);
