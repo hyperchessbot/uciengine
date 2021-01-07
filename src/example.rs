@@ -47,9 +47,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 		let go_result = engine.go(go_job2).recv().await;
 
 		println!("go result 2 {:?}", go_result);
+		
+		engine.quit();
 	});
 	
-	tokio::time::sleep(tokio::time::Duration::from_millis(10000)).await;
+	tokio::time::sleep(tokio::time::Duration::from_millis(20000)).await;
 		
 	Ok(())
 }

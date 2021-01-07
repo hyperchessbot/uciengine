@@ -34,6 +34,8 @@ pub struct GoJob {
 	go_options: HashMap<String, String>,
 	/// result sender
 	rtx: Option<Sender<GoResult>>,
+	/// custom command
+	custom_command: Option<String>,
 }
 
 /// time control
@@ -74,12 +76,27 @@ impl GoJob {
 			uci_options: HashMap::new(),
 			go_options: HashMap::new(),
 			rtx: None,
+			custom_command: None
 		}
+	}
+	
+	/// custom command
+	pub fn custom<T>(mut self, command: T) -> GoJob
+	where T: core::fmt::Display {
+		self.custom_command = Some(format!("{}", command));
+		
+		self
 	}
 	
 	/// to commands
 	pub fn to_commands(&self) -> Vec<String> {
 		let mut commands:Vec<String> = vec!();
+		
+		if let Some(command) = &self.custom_command {
+			commands.push(format!("{}", command));
+			
+			return commands
+		}
 		
 		for (key, value) in &self.uci_options {
 			commands.push(format!("setoption name {} value {}", key, value));			
@@ -275,7 +292,7 @@ impl UciEngine {
 					let command = format!("{}\n", command);
 					
 					if log_enabled!(Level::Debug) {
-						debug!("issuing engine command {}", command);
+						debug!("issuing engine command : {}", command);
 					}
 					
 					let write_result = stdin.write_all(command.as_bytes()).await;
@@ -285,31 +302,33 @@ impl UciEngine {
 					}
 				}
 				
-				let recv_result = rx.recv().await.unwrap();
-				
-				if log_enabled!(Level::Debug) {
-					debug!("recv result {:?}", recv_result);
-				}
-				
-				let parts:Vec<&str> = recv_result.split(" ").collect();
-				
-				let mut go_result = GoResult{
-					bestmove: None,
-					ponder: None,
-				};
-				
-				if parts.len() > 1 {
-					go_result.bestmove = Some(parts[1].to_string());
-				}
-				
-				if parts.len() > 3 {
-					go_result.ponder = Some(parts[3].to_string());
-				}
-				
-				let send_result = go_job.rtx.unwrap().send(go_result).await;
-				
-				if log_enabled!(Level::Debug) {
-					debug!("result of send go result {:?}", send_result);
+				if go_job.custom_command.is_none() {
+					let recv_result = rx.recv().await.unwrap();
+
+					if log_enabled!(Level::Debug) {
+						debug!("recv result {:?}", recv_result);
+					}
+
+					let parts:Vec<&str> = recv_result.split(" ").collect();
+
+					let mut go_result = GoResult{
+						bestmove: None,
+						ponder: None,
+					};
+
+					if parts.len() > 1 {
+						go_result.bestmove = Some(parts[1].to_string());
+					}
+
+					if parts.len() > 3 {
+						go_result.ponder = Some(parts[3].to_string());
+					}
+
+					let send_result = go_job.rtx.unwrap().send(go_result).await;
+
+					if log_enabled!(Level::Debug) {
+						debug!("result of send go result {:?}", send_result);
+					}
 				}
 			}
 		});
@@ -338,5 +357,10 @@ impl UciEngine {
 		}
 		
 		rrx
+	}
+	
+	/// quit engine
+	pub fn quit(&self) {
+		self.go(GoJob::new().custom("quit"));
 	}
 }

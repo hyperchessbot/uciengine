@@ -38,16 +38,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 		.go_opt("depth", 12)
 	;
 			
-	let pool = std::sync::Arc::new(UciEnginePool::new());
-		
-	let engine = std::sync::Arc::new(pool.create_engine("./stockfish12"));
+	let engine = UciEngine::new("./stockfish12");
 	
 	let ( engine_clone1 , engine_clone2 ) = ( engine.clone(), engine.clone() );
 	
 	tokio::spawn(async move {	
 		let engine = engine_clone1;
 	
-		let go_result = UciEnginePool::enqueue_go_job(engine, go_job1).recv().await;
+		let go_result = engine.go(go_job1).recv().await;
 
 		println!("go result 1 {:?}", go_result);
 	});
@@ -55,9 +53,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 	tokio::spawn(async move {		
 		let engine = engine_clone2;
 	
-		let go_result = UciEnginePool::enqueue_go_job(engine, go_job2).recv().await;
+		let go_result = engine.go(go_job2).recv().await;
 
 		println!("go result 2 {:?}", go_result);
+		
+		engine.quit();
 	});
 	
 	tokio::time::sleep(tokio::time::Duration::from_millis(10000)).await;
