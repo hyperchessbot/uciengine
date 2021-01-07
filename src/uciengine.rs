@@ -323,7 +323,7 @@ impl UciEnginePool {
 	}
 	
 	/// enqueue go job
-	pub fn enqueue_go_job(&self, gtx: std::sync::Arc<tokio::sync::mpsc::UnboundedSender<GoJob>>, go_job: GoJob) -> Receiver<GoResult> {	
+	pub fn enqueue_go_job(gtx: std::sync::Arc<tokio::sync::mpsc::UnboundedSender<GoJob>>, go_job: GoJob) -> Receiver<GoResult> {	
 		let mut go_job = go_job;
 		
 		let (rtx, rrx):(Sender<GoResult>, Receiver<GoResult>) = tokio::sync::mpsc::channel(1);

@@ -40,31 +40,26 @@
 //!	;
 //!			
 //!	let pool = std::sync::Arc::new(UciEnginePool::new());
-//!	
-//!	let pool_clone1 = pool.clone();
-//!	let pool_clone2 = pool.clone();
-//!	
+//!		
 //!	let engine = std::sync::Arc::new(pool.create_engine("./stockfish12"));
 //!	
 //!	let engine_clone1 = engine.clone();
 //!	let engine_clone2 = engine.clone();
 //!	
-//!	tokio::spawn(async move {
-//!		let pool = pool_clone1;
+//!	tokio::spawn(async move {	
 //!		let engine = engine_clone1;
 //!		
-//!		let mut rx = pool.enqueue_go_job(engine, go_job1);
+//!		let mut rx = UciEnginePool::enqueue_go_job(engine, go_job1);
 //!	
 //!		let go_result = rx.recv().await;
 //!
 //!		println!("go result 1 {:?}", go_result);
 //!	});
 //!	
-//!	tokio::spawn(async move {
-//!		let pool = pool_clone2;
+//!	tokio::spawn(async move {		
 //!		let engine = engine_clone2;
 //!		
-//!		let mut rx = pool.enqueue_go_job(engine, go_job2);
+//!		let mut rx = UciEnginePool::enqueue_go_job(engine, go_job2);
 //!	
 //!		let go_result = rx.recv().await;
 //!
