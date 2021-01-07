@@ -23,40 +23,30 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 		})
 	;
 	
-	let go_job2 = GoJob::new()						
+	let go_job2 = GoJob::new()			
+		.uci_opt("UCI_Variant", "chess")
 		.pos_startpos()
-		.pos_moves("e2e4")
-		.tc(Timecontrol{
-			wtime: 15000,
-			winc: 0,
-			btime: 15000,
-			binc: 0
-		})
+		.go_opt("depth", 12)
 	;
 			
 	let pool = std::sync::Arc::new(UciEnginePool::new());
 		
 	let engine = std::sync::Arc::new(pool.create_engine("./stockfish12"));
 	
-	let engine_clone1 = engine.clone();
-	let engine_clone2 = engine.clone();
+	let ( engine_clone1 , engine_clone2 ) = ( engine.clone(), engine.clone() );
 	
 	tokio::spawn(async move {	
 		let engine = engine_clone1;
-		
-		let mut rx = UciEnginePool::enqueue_go_job(engine, go_job1);
 	
-		let go_result = rx.recv().await;
+		let go_result = UciEnginePool::enqueue_go_job(engine, go_job1).recv().await;
 
 		println!("go result 1 {:?}", go_result);
 	});
 	
 	tokio::spawn(async move {		
 		let engine = engine_clone2;
-		
-		let mut rx = UciEnginePool::enqueue_go_job(engine, go_job2);
 	
-		let go_result = rx.recv().await;
+		let go_result = UciEnginePool::enqueue_go_job(engine, go_job2).recv().await;
 
 		println!("go result 2 {:?}", go_result);
 	});
