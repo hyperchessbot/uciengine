@@ -178,20 +178,15 @@ pub struct GoResult {
 	ponder: Option<String>,
 }
 
-/// uci engine pool
-pub struct UciEnginePool {			
+/// uci engine
+pub struct UciEngine {			
+	gtx: tokio::sync::mpsc::UnboundedSender<GoJob>,
 }
 
-/// uci engine pool implementation
-impl UciEnginePool {
-	/// create new uci engine pool
-	pub fn new() -> UciEnginePool {
-		UciEnginePool {									
-		}
-	}
-		
-	/// create new engine and return its handle
-	pub fn create_engine<T>(&self, path: T) -> tokio::sync::mpsc::UnboundedSender<GoJob>
+/// uci engine implementation
+impl UciEngine {
+	/// create new engine
+	pub fn new<T>(path: T) -> UciEngine
 	where T : core::fmt::Display {
 		let path = format!("{}", path);
 		
@@ -323,18 +318,20 @@ impl UciEnginePool {
 			info!("spawned uci engine : {}", path);
 		}		
 		
-		gtx
+		UciEngine{
+			gtx: gtx,	
+		}		
 	}
 	
-	/// enqueue go job
-	pub fn enqueue_go_job(gtx: std::sync::Arc<tokio::sync::mpsc::UnboundedSender<GoJob>>, go_job: GoJob) -> Receiver<GoResult> {	
+	/// go
+	pub fn go(&self, go_job: GoJob) -> Receiver<GoResult> {	
 		let mut go_job = go_job;
 		
 		let (rtx, rrx):(Sender<GoResult>, Receiver<GoResult>) = tokio::sync::mpsc::channel(1);
 		
 		go_job.rtx = Some(rtx);
 		
-		let send_result = gtx.send(go_job);		
+		let send_result = self.gtx.send(go_job);		
 		
 		if log_enabled!(Level::Debug) {
 			debug!("send go job result {:?}", send_result);
