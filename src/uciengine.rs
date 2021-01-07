@@ -1,4 +1,4 @@
-use log::{debug, log_enabled, info, Level};
+use log::{error, debug, log_enabled, info, Level};
 
 use tokio::process::Command;
 use tokio::io::{BufReader, AsyncBufReadExt, AsyncWriteExt};
@@ -189,31 +189,7 @@ impl UciEnginePool {
 		UciEnginePool {									
 		}
 	}
-	
-	/// read stdout of engine process
-	async fn read_stdout(
-		tx: Sender<String>,
-		mut reader: tokio::io::Lines<tokio::io::BufReader<tokio::process::ChildStdout>>
-	) -> Result<(), Box<dyn std::error::Error>> {
-		while let Some(line) = reader.next_line().await? {
-			if log_enabled!(Level::Info) {
-				info!("uci engine out : {}", line);
-			}	
-			
-			if line.len() >= 8 {
-				if &line[0..8] == "bestmove" {
-					let send_result = tx.send(line).await;					
-					
-					if log_enabled!(Level::Debug) {
-						debug!("send bestmove result {:?}", send_result);
-					}
-				}	
-			}
-		}
-
-		Ok(())
-	}
-	
+		
 	/// create new engine and return its handle
 	pub fn create_engine<T>(&self, path: T) -> tokio::sync::mpsc::UnboundedSender<GoJob>
 	where T : core::fmt::Display {
@@ -246,19 +222,47 @@ impl UciEnginePool {
 			}			
 		});
 
-		tokio::spawn(async {
-			match UciEnginePool::read_stdout(tx, reader).await {
-				Ok(result) => {
-					if log_enabled!(Level::Debug) {
-						debug!("reader ok {:?}", result)
-					}		
-				},
-				Err(err) => {
-					if log_enabled!(Level::Debug) {
-						debug!("reader err {:?}", err)
-					}		
+		tokio::spawn(async move {
+			let mut reader = reader;
+			
+			loop {
+				match reader.next_line().await {
+					Ok(line_opt) => {
+						if let Some(line) = line_opt {
+							if log_enabled!(Level::Info) {
+								info!("uci engine out : {}", line);
+							}	
+
+							if line.len() >= 8 {
+								if &line[0..8] == "bestmove" {
+									let send_result = tx.send(line).await;					
+
+									if log_enabled!(Level::Debug) {
+										debug!("send bestmove result {:?}", send_result);
+									}
+								}	
+							}
+						} else {
+							if log_enabled!(Level::Debug) {
+								debug!("engine returned empty line option");
+							}	
+							
+							break
+						}
+					},
+					Err(err) => {
+						if log_enabled!(Level::Error) {
+							error!("engine read error {:?}", err);
+						}	
+						
+						break
+					}
 				}
 			}
+			
+			if log_enabled!(Level::Debug) {
+				debug!("engine read terminated");
+			}	
 		});
 		
 		let (gtx, grx) = tokio::sync::mpsc::unbounded_channel::<GoJob>();
