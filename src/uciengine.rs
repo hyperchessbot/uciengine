@@ -186,7 +186,7 @@ pub struct UciEngine {
 /// uci engine implementation
 impl UciEngine {
 	/// create new engine
-	pub fn new<T>(path: T) -> UciEngine
+	pub fn new<T>(path: T) -> std::sync::Arc<UciEngine>
 	where T : core::fmt::Display {
 		let path = format!("{}", path);
 		
@@ -318,9 +318,9 @@ impl UciEngine {
 			info!("spawned uci engine : {}", path);
 		}		
 		
-		UciEngine{
+		std::sync::Arc::new(UciEngine{
 			gtx: gtx,	
-		}		
+		})		
 	}
 	
 	/// go

@@ -29,7 +29,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 		.go_opt("depth", 12)
 	;
 			
-	let engine = std::sync::Arc::new(UciEngine::new("./stockfish12"));
+	let engine = UciEngine::new("./stockfish12");
 	
 	let ( engine_clone1 , engine_clone2 ) = ( engine.clone(), engine.clone() );
 	
