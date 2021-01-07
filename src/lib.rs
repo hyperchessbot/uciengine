@@ -14,7 +14,7 @@
 //!	
 //!	info!("starting up");
 //!	
-//!	let go_job = GoJob::new()				
+//!	let go_job1 = GoJob::new()				
 //!		.uci_opt("UCI_Variant", "atomic")
 //!		.uci_opt("Hash", 128)
 //!		.uci_opt("Threads", 4)
@@ -28,18 +28,51 @@
 //!		})
 //!	;
 //!	
-//!	println!("commands {:?}", go_job.to_commands());
+//!	let go_job2 = GoJob::new()						
+//!		.pos_startpos()
+//!		.pos_moves("e2e4")
+//!		.tc(Timecontrol{
+//!			wtime: 15000,
+//!			winc: 0,
+//!			btime: 15000,
+//!			binc: 0
+//!		})
+//!	;
+//!			
+//!	let pool = std::sync::Arc::new(UciEnginePool::new());
+//!	
+//!	let pool_clone1 = pool.clone();
+//!	let pool_clone2 = pool.clone();
+//!	
+//!	let engine = std::sync::Arc::new(pool.create_engine("./stockfish12"));
+//!	
+//!	let engine_clone1 = engine.clone();
+//!	let engine_clone2 = engine.clone();
+//!	
+//!	tokio::spawn(async move {
+//!		let pool = pool_clone1;
+//!		let engine = engine_clone1;
 //!		
-//!	let mut pool = UciEnginePool::new();
+//!		let mut rx = pool.enqueue_go_job(engine, go_job1);
 //!	
-//!	let engine = pool.create_engine("./stockfish12");
+//!		let go_result = rx.recv().await;
+//!
+//!		println!("go result 1 {:?}", go_result);
+//!	});
 //!	
-//!	let mut rx = pool.enqueue_go_job(engine, go_job);
+//!	tokio::spawn(async move {
+//!		let pool = pool_clone2;
+//!		let engine = engine_clone2;
+//!		
+//!		let mut rx = pool.enqueue_go_job(engine, go_job2);
 //!	
-//!	let go_result = rx.recv().await;
+//!		let go_result = rx.recv().await;
+//!
+//!		println!("go result 2 {:?}", go_result);
+//!	});
 //!	
-//!	println!("go result {:?}", go_result);
-//!	
+//!	tokio::time::sleep(tokio::time::Duration::from_millis(10000)).await;
+//!		
 //!	Ok(())
 //!}
 //!```

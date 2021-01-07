@@ -151,8 +151,9 @@ impl GoJob {
 	}
 	
 	/// set go option as key value pair and return self
-	pub fn go_opt(mut self, key:String, value:String) -> GoJob {
-		self.go_options.insert(key, value);
+	pub fn go_opt<K,V>(mut self, key:K, value:V) -> GoJob 
+	where K: core::fmt::Display, V: core::fmt::Display {
+		self.go_options.insert(format!("{}", key), format!("{}",value));
 		
 		self
 	}
@@ -178,17 +179,14 @@ pub struct GoResult {
 }
 
 /// uci engine pool
-pub struct UciEnginePool {		
-	/// senders of go jobs
-	gtxs: Vec<tokio::sync::mpsc::UnboundedSender<GoJob>>,
+pub struct UciEnginePool {			
 }
 
 /// uci engine pool implementation
 impl UciEnginePool {
 	/// create new uci engine pool
 	pub fn new() -> UciEnginePool {
-		UciEnginePool {						
-			gtxs: vec!(),
+		UciEnginePool {									
 		}
 	}
 	
@@ -217,7 +215,7 @@ impl UciEnginePool {
 	}
 	
 	/// create new engine and return its handle
-	pub fn create_engine<T>(&mut self, path: T) -> usize 
+	pub fn create_engine<T>(&self, path: T) -> tokio::sync::mpsc::UnboundedSender<GoJob>
 	where T : core::fmt::Display {
 		let path = format!("{}", path);
 		
@@ -264,10 +262,6 @@ impl UciEnginePool {
 		});
 		
 		let (gtx, grx) = tokio::sync::mpsc::unbounded_channel::<GoJob>();
-		
-		self.gtxs.push(gtx);
-		
-		let handle = self.gtxs.len() - 1;
 		
 		tokio::spawn(async move {				
 			let mut stdin = stdin;
@@ -325,18 +319,18 @@ impl UciEnginePool {
 			info!("spawned uci engine : {}", path);
 		}		
 		
-		handle
+		gtx
 	}
 	
 	/// enqueue go job
-	pub fn enqueue_go_job(&mut self, handle: usize, go_job: GoJob) -> Receiver<GoResult> {	
+	pub fn enqueue_go_job(&self, gtx: std::sync::Arc<tokio::sync::mpsc::UnboundedSender<GoJob>>, go_job: GoJob) -> Receiver<GoResult> {	
 		let mut go_job = go_job;
 		
 		let (rtx, rrx):(Sender<GoResult>, Receiver<GoResult>) = tokio::sync::mpsc::channel(1);
 		
 		go_job.rtx = Some(rtx);
 		
-		let send_result = self.gtxs[handle].send(go_job);		
+		let send_result = gtx.send(go_job);		
 		
 		if log_enabled!(Level::Debug) {
 			debug!("send go job result {:?}", send_result);
