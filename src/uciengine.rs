@@ -190,9 +190,9 @@ impl GoJob {
 #[derive(Debug)]
 pub struct GoResult {
 	/// best move if any
-	bestmove: Option<String>,
+	pub bestmove: Option<String>,
 	/// ponder if any
-	ponder: Option<String>,
+	pub ponder: Option<String>,
 }
 
 /// uci engine
