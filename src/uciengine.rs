@@ -294,8 +294,8 @@ impl UciEngine {
 				match reader.next_line().await {
 					Ok(line_opt) => {
 						if let Some(line) = line_opt {
-							if log_enabled!(Level::Info) {
-								info!("uci engine out : {}", line);
+							if log_enabled!(Level::Debug) {
+								debug!("uci engine out : {}", line);
 							}	
 
 							if line.len() >= 8 {
