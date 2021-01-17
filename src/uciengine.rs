@@ -36,6 +36,12 @@ pub struct GoJob {
 	rtx: Option<Sender<GoResult>>,
 	/// custom command
 	custom_command: Option<String>,
+	/// ponder ( go option )
+	ponder: bool,
+	/// ponderhit ( ponderhit uci commend )
+	ponderhit: bool,
+	/// pondermiss ( alias to awaited stop )
+	pondermiss: bool,
 }
 
 /// time control
@@ -76,7 +82,10 @@ impl GoJob {
 			uci_options: HashMap::new(),
 			go_options: HashMap::new(),
 			rtx: None,
-			custom_command: None
+			custom_command: None,
+			ponder: false,
+			ponderhit: false,
+			pondermiss: false,
 		}
 	}
 	
@@ -91,6 +100,18 @@ impl GoJob {
 	/// to commands
 	pub fn to_commands(&self) -> Vec<String> {
 		let mut commands:Vec<String> = vec!();
+
+		if self.ponderhit {
+			commands.push(format!("{}", "ponderhit"));
+			
+			return commands
+		}
+
+		if self.pondermiss {
+			commands.push(format!("{}", "stop"));
+			
+			return commands
+		}
 		
 		if let Some(command) = &self.custom_command {
 			commands.push(format!("{}", command));
@@ -129,10 +150,42 @@ impl GoJob {
 		for (key, value) in &self.go_options {
 			go_command = go_command + &format!(" {} {}", key, value);
 		}
+
+		if self.ponder {
+			go_command = go_command + &format!(" {}", "ponder");
+		}
 		
 		commands.push(go_command);
 		
 		commands
+	}
+
+	/// set ponder
+	pub fn set_ponder(mut self, value: bool) -> GoJob where {
+		self.ponder = value;
+		
+		self
+	}
+
+	/// ponder
+	pub fn ponder(mut self) -> GoJob where {
+		self.ponder = true;
+		
+		self
+	}
+
+	/// ponderhit
+	pub fn ponderhit(mut self) -> GoJob where {
+		self.ponderhit = true;
+		
+		self
+	}
+
+	/// pondermiss
+	pub fn pondermiss(mut self) -> GoJob where {
+		self.pondermiss = true;
+		
+		self
 	}
 	
 	/// set position fen and return self
@@ -283,6 +336,7 @@ impl UciEngine {
 			let mut stdin = stdin;
 			let mut grx = grx;
 			let mut rx = rx;
+			
 			while let Some(go_job) = grx.recv().await {
 				if log_enabled!(Level::Debug) {
 					debug!("received go job {:?}", go_job);
@@ -302,7 +356,7 @@ impl UciEngine {
 					}
 				}
 				
-				if go_job.custom_command.is_none() {
+				if go_job.custom_command.is_none() && (!go_job.ponder) {
 					let recv_result = rx.recv().await.unwrap();
 
 					if log_enabled!(Level::Debug) {

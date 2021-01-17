@@ -1,6 +1,6 @@
 [package]
 name = "uciengine"
-version = "0.1.22"
+version = "0.1.23"
 authors = ["hyperchessbot <hyperchessbot@gmail.com>"]
 edition = "2018"
 keywords = ["uci", "chess", "engine", "wrapper"]
@@ -8,8 +8,9 @@ description = "Use chess engine wrapper supporting uci command necessary for pla
 license = "MIT"
 repository = "https://github.com/hyperchessbot/uciengine"
 homepage = "https://github.com/hyperchessbot/uciengine#uciengine"
-documentation = "https://docs.rs/uciengine/0.1.22"
+documentation = "https://docs.rs/uciengine/0.1.23"
 readme = "ReadMe.md"
+default-run = "example"
 
 [dependencies]
 log = "0.4.11"
@@ -22,5 +23,9 @@ features = ["full"]
 [[bin]]
 name = "example"
 path = "src/example.rs"
+
+[[bin]]
+name = "ponder"
+path = "src/ponder.rs"
 
 [lib]
