@@ -91,8 +91,9 @@ impl GoJob {
 
     /// set custom command and return self,
     /// if set, other settings will be ignored
-    /// and only this single command will be sent
-    pub fn custom<T>(mut self, command: T) -> GoJob
+    /// and only this single command will be sent,
+    /// returns self
+    pub fn custom<T>(mut self, command: T) -> Self
     where
         T: core::fmt::Display,
     {
@@ -165,28 +166,28 @@ impl GoJob {
     }
 
     /// set ponder and return self
-    pub fn set_ponder(mut self, value: bool) -> Self where {
+    pub fn set_ponder(mut self, value: bool) -> Self {
         self.ponder = value;
 
         self
     }
 
     /// set ponder to true and return self
-    pub fn ponder(mut self) -> Self where {
+    pub fn ponder(mut self) -> Self {
         self.ponder = true;
 
         self
     }
 
     /// set ponderhit and return self
-    pub fn ponderhit(mut self) -> Self where {
+    pub fn ponderhit(mut self) -> Self {
         self.ponderhit = true;
 
         self
     }
 
     /// set pondermiss and return self
-    pub fn pondermiss(mut self) -> Self where {
+    pub fn pondermiss(mut self) -> Self {
         self.pondermiss = true;
 
         self
