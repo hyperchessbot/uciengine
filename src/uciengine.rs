@@ -278,6 +278,8 @@ pub struct GoResult {
     pub bestmove: Option<String>,
     /// ponder if any
     pub ponder: Option<String>,
+    /// analysis info
+    pub ai: AnalysisInfo,
 }
 
 /// uci engine
@@ -349,13 +351,13 @@ impl UciEngine {
                                 debug!("uci engine out : {}", line);
                             }
 
-                            let mut ai = ai.lock().unwrap();
+                            {
+                                let mut ai = ai.lock().unwrap();
 
-                            ai.parse(line.to_owned());
+                                ai.parse(line.to_owned());
 
-                            debug!("{:?}", ai);
-
-                            drop(ai);
+                                debug!("{:?}", ai);
+                            }
 
                             if line.len() >= 8 {
                                 if &line[0..8] == "bestmove" {
@@ -392,10 +394,13 @@ impl UciEngine {
         // channel for sending go jobs
         let (gtx, grx) = mpsc::unbounded_channel::<GoJob>();
 
+        let ai_clone = ai.clone();
+
         tokio::spawn(async move {
             let mut stdin = stdin;
             let mut grx = grx;
             let mut rx = rx;
+            let ai = ai_clone;
 
             while let Some(go_job) = grx.recv().await {
                 if log_enabled!(Level::Debug) {
@@ -417,6 +422,12 @@ impl UciEngine {
                 }
 
                 if go_job.custom_command.is_none() && (!go_job.ponder) {
+                    {
+                        let mut ai = ai.lock().unwrap();
+
+                        *ai = AnalysisInfo::new();
+                    }
+
                     let recv_result = rx.recv().await.unwrap();
 
                     if log_enabled!(Level::Debug) {
@@ -425,9 +436,18 @@ impl UciEngine {
 
                     let parts: Vec<&str> = recv_result.split(" ").collect();
 
+                    let send_ai: AnalysisInfo;
+
+                    {
+                        let ai = ai.lock().unwrap();
+
+                        send_ai = *ai;
+                    }
+
                     let mut go_result = GoResult {
                         bestmove: None,
                         ponder: None,
+                        ai: send_ai,
                     };
 
                     if parts.len() > 1 {
