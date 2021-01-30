@@ -35,10 +35,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let engine = UciEngine::new("./stockfish12");
 
-    // make two clones of the engine, so that we can move its clones to async blocks
+    // make two clones of the engine, so that we can move them to async blocks
     let (engine_clone1, engine_clone2) = (engine.clone(), engine.clone());
 
-    // make two parallel async go commands, to demonstrate that they will be queued and processed one a time
+    // issue two parallel async go commands, to demonstrate that they will be queued and processed one a time
     tokio::spawn(async move {
         let go_result1 = engine_clone1.go(go_job1).await;
 
@@ -51,7 +51,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         println!("go result 2 {:?}", go_result2);
     });
 
-    // wait enough for go commands to complete in the background
+    // wait enough for the go commands to complete in the background
     tokio::time::sleep(tokio::time::Duration::from_millis(20000)).await;
 
     // quit engine

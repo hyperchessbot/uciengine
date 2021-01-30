@@ -211,7 +211,16 @@ impl GoJob {
         self
     }
 
-    /// set position moves and return self
+    /// set position moves and return self,
+    /// moves should be a space separated string of uci moves,
+    /// as described by the UCI protocol
+    ///
+    /// ### Example
+    /// ```
+    /// let go_job = GoJob::new()
+    ///                .pos_startpos()
+    ///                .pos_moves("e2e4 e7e5 g1f3");
+    /// ```
     pub fn pos_moves<T>(mut self, moves: T) -> Self
     where
         T: core::fmt::Display,
