@@ -6,7 +6,7 @@ use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
 use tokio::process::Command;
 use tokio::sync::*;
 
-/// enum of possible position sepcifiers
+/// enum of possible position specifiers
 #[derive(Debug)]
 pub enum PosSpec {
     /// starting position
@@ -44,7 +44,7 @@ pub struct GoJob {
     rtx: Option<oneshot::Sender<GoResult>>,
 }
 
-/// time control
+/// time control ( all values are in milliseconds )
 #[derive(Debug)]
 pub struct Timecontrol {
     /// white time
@@ -101,7 +101,7 @@ impl GoJob {
         self
     }
 
-    /// conver go job to commands
+    /// convert go job to commands
     pub fn to_commands(&self) -> Vec<String> {
         let mut commands: Vec<String> = vec![];
 
@@ -275,7 +275,7 @@ pub struct UciEngine {
 
 /// uci engine implementation
 impl UciEngine {
-    /// create new engine
+    /// create new uci engine
     pub fn new<T>(path: T) -> std::sync::Arc<UciEngine>
     where
         T: core::fmt::Display,

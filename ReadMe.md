@@ -2,7 +2,7 @@
 
 [![documentation](https://docs.rs/uciengine/badge.svg)](https://docs.rs/uciengine) [![Crates.io](https://img.shields.io/crates/v/uciengine.svg)](https://crates.io/crates/uciengine) [![Crates.io (recent)](https://img.shields.io/crates/dr/uciengine)](https://crates.io/crates/uciengine)
 
-Rust uci engine wrapper. Allows doing multiple searches from parallel asyncs. Searches are queued and done one by one in a way opaque to the receiver of the result. Analysis mode / streaming results while searching is not supported. You issue a go / ponderhit / pondermiss command and await on bestmove / ponder. ( Pondermiss is a fancy name for awaited stop command, to reflect the use case of a failed ponder. )
+Rust UCI chess engine wrapper. Implements a useful fraction of the UCI protocol ( http://wbec-ridderkerk.nl/html/UCIProtocol.html ). Allows doing multiple searches from parallel asyncs. Searches are queued and done one by one in a way opaque to the receiver of the result. Primary goal of the crate is to support play mode. Analysis mode / streaming results while searching is not supported. You issue a go / ponderhit / pondermiss command and await on bestmove / ponder. ( Pondermiss is a fancy name used by the crate for an awaited stop command, to reflect the use case of a failed ponder. )
 
 # Usage
 
