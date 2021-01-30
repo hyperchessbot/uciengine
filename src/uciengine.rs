@@ -6,6 +6,8 @@ use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
 use tokio::process::Command;
 use tokio::sync::*;
 
+use crate::analysis::*;
+
 /// enum of possible position specifiers
 #[derive(Debug)]
 pub enum PosSpec {
@@ -281,6 +283,7 @@ pub struct GoResult {
 /// uci engine
 pub struct UciEngine {
     gtx: mpsc::UnboundedSender<GoJob>,
+    ai: std::sync::Arc<std::sync::Mutex<AnalysisInfo>>,
 }
 
 /// uci engine implementation
@@ -330,8 +333,13 @@ impl UciEngine {
             }
         });
 
+        let ai = std::sync::Arc::new(std::sync::Mutex::new(AnalysisInfo::new()));
+
+        let ai_clone = ai.clone();
+
         tokio::spawn(async move {
             let mut reader = reader;
+            let ai = ai_clone;
 
             loop {
                 match reader.next_line().await {
@@ -340,6 +348,14 @@ impl UciEngine {
                             if log_enabled!(Level::Debug) {
                                 debug!("uci engine out : {}", line);
                             }
+
+                            let mut ai = ai.lock().unwrap();
+
+                            ai.parse(line.to_owned());
+
+                            debug!("{:?}", ai);
+
+                            drop(ai);
 
                             if line.len() >= 8 {
                                 if &line[0..8] == "bestmove" {
@@ -435,7 +451,14 @@ impl UciEngine {
             info!("spawned uci engine : {}", path);
         }
 
-        std::sync::Arc::new(UciEngine { gtx: gtx })
+        std::sync::Arc::new(UciEngine { gtx: gtx, ai: ai })
+    }
+
+    /// get analysis info
+    pub fn get_ai(&self) -> AnalysisInfo {
+        let ai = self.ai.lock().unwrap();
+
+        *ai
     }
 
     /// issue go command

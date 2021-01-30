@@ -97,8 +97,14 @@ pub struct AnalysisInfo {
     ponder: UciBuff,
     /// pv
     pv: PvBuff,
+    /// multipv
+    pub multipv: usize,
     /// depth
     pub depth: usize,
+    /// seldepth
+    pub seldepth: usize,
+    /// tbhits
+    pub tbhits: u64,
     /// nodes
     pub nodes: u64,
     /// time
@@ -117,7 +123,10 @@ pub enum ParsingState {
     Info,
     Key,
     Unknown,
+    Multipv,
     Depth,
+    Seldepth,
+    Tbhits,
     Nodes,
     Time,
     Nps,
@@ -137,7 +146,10 @@ impl AnalysisInfo {
             bestmove: UciBuff::new(),
             ponder: UciBuff::new(),
             pv: PvBuff::new(),
+            multipv: 0,
             depth: 0,
+            seldepth: 0,
+            tbhits: 0,
             nodes: 0,
             time: 0,
             nps: 0,
@@ -168,7 +180,6 @@ impl AnalysisInfo {
         let mut pv_on = false;
 
         for token in info.split(" ") {
-            println!("{:?} <- {}", ps, token);
             match ps {
                 ParsingState::Info => {
                     match token {
@@ -187,7 +198,10 @@ impl AnalysisInfo {
                     }
 
                     ps = match token {
+                        "multipv" => ParsingState::Multipv,
                         "depth" => ParsingState::Depth,
+                        "seldepth" => ParsingState::Seldepth,
+                        "tbhits" => ParsingState::Tbhits,
                         "nodes" => ParsingState::Nodes,
                         "time" => ParsingState::Time,
                         "nps" => ParsingState::Nps,
@@ -211,10 +225,28 @@ impl AnalysisInfo {
                 }
                 _ => {
                     match ps {
+                        ParsingState::Multipv => match token.parse::<usize>() {
+                            Ok(multipv) => self.multipv = multipv,
+                            _ => {
+                                warn!("could not parse multipv from {}", token)
+                            }
+                        },
                         ParsingState::Depth => match token.parse::<usize>() {
                             Ok(depth) => self.depth = depth,
                             _ => {
                                 warn!("could not parse depth from {}", token)
+                            }
+                        },
+                        ParsingState::Seldepth => match token.parse::<usize>() {
+                            Ok(seldepth) => self.seldepth = seldepth,
+                            _ => {
+                                warn!("could not parse seldepth from {}", token)
+                            }
+                        },
+                        ParsingState::Tbhits => match token.parse::<u64>() {
+                            Ok(tbhits) => self.tbhits = tbhits,
+                            _ => {
+                                warn!("could not parse tbhits from {}", token)
                             }
                         },
                         ParsingState::Nodes => match token.parse::<u64>() {
