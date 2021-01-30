@@ -1,3 +1,5 @@
+use log::warn;
+
 macro_rules! gen_str_buff {
 	($(#[$attr:meta] => $type:ident, $size:expr),*) => { $(
 	    #[$attr]
@@ -13,6 +15,14 @@ macro_rules! gen_str_buff {
 					len: 0,
 					buff: [0; $size]
 				}
+			}
+
+			pub fn to_opt(self) -> Option<String> {
+				if self.len == 0 {
+					return None;
+				}
+
+				Some(String::from(self))
 			}
 		}
 
@@ -30,6 +40,12 @@ macro_rules! gen_str_buff {
 				buff.buff[0..len].copy_from_slice(&bytes[0..len]);
 
 				buff
+			}
+		}
+
+		impl std::convert::From<String> for $type {
+			fn from(value: String) -> Self {
+				Self::from(value.as_str())
 			}
 		}
 
@@ -72,8 +88,6 @@ pub enum Score {
     Mate(i32),
 }
 
-use Score::*;
-
 /// analysis info
 #[derive(Debug, Clone, Copy)]
 pub struct AnalysisInfo {
@@ -90,9 +104,29 @@ pub struct AnalysisInfo {
     /// time
     pub time: usize,
     /// nodes per second
-    pub nps: usize,
+    pub nps: u64,
     /// score ( centipawns or mate )
     pub score: Score,
+}
+
+/// parsing state
+#[derive(Debug)]
+#[allow(dead_code)]
+// TODO: make this pub(crate)
+pub enum ParsingState {
+    Info,
+    Key,
+    Unknown,
+    Depth,
+    Nodes,
+    Time,
+    Nps,
+    Score,
+    ScoreCp,
+    ScoreMate,
+    PvBestmove,
+    PvPonder,
+    PvRest,
 }
 
 /// analysis info implementation
@@ -107,24 +141,141 @@ impl AnalysisInfo {
             nodes: 0,
             time: 0,
             nps: 0,
-            score: Cp(0),
+            score: Score::Cp(0),
         }
     }
-}
 
-/// parsing state
-#[derive(Debug)]
-#[allow(dead_code)]
-// TODO: make this pub(crate)
-pub enum ParsingState {
-    Init,
-    Unknown,
-    Depth,
-    Nodes,
-    Time,
-    Nps,
-    Score,
-    ScoreCp,
-    ScoreMate,
-    Pv,
+    // get bestmove
+    pub fn bestmove(self) -> Option<String> {
+        self.bestmove.to_opt()
+    }
+
+    // get ponder
+    pub fn ponder(self) -> Option<String> {
+        self.ponder.to_opt()
+    }
+
+    // get pv
+    pub fn pv(self) -> Option<String> {
+        self.pv.to_opt()
+    }
+
+    /// parse info string
+    pub fn parse<T: std::convert::AsRef<str>>(&mut self, info: T) {
+        let info = info.as_ref();
+        let mut ps = ParsingState::Info;
+        let mut pv_buff = String::new();
+        let mut pv_on = false;
+
+        for token in info.split(" ") {
+            println!("{:?} <- {}", ps, token);
+            match ps {
+                ParsingState::Info => {
+                    match token {
+                        "info" => ps = ParsingState::Key,
+                        _ => {
+                            // not an info
+                            return;
+                        }
+                    }
+                }
+                ParsingState::Key => {
+                    if token == "string" {
+                        // anything starting with 'info string' is not analysis info
+                        // occuring later in key position 'string' is not a valid analysis info token
+                        return;
+                    }
+
+                    ps = match token {
+                        "depth" => ParsingState::Depth,
+                        "nodes" => ParsingState::Nodes,
+                        "time" => ParsingState::Time,
+                        "nps" => ParsingState::Nps,
+                        "score" => ParsingState::Score,
+                        "pv" => ParsingState::PvBestmove,
+                        _ => ParsingState::Unknown,
+                    }
+                }
+                ParsingState::Score => match token {
+                    "cp" => ps = ParsingState::ScoreCp,
+                    "mate" => ps = ParsingState::ScoreMate,
+                    _ => {
+                        warn!("invalid score specifier {}", token);
+
+                        return;
+                    }
+                },
+                ParsingState::Unknown => {
+                    // ignore this token and hope for the best
+                    ps = ParsingState::Key
+                }
+                _ => {
+                    match ps {
+                        ParsingState::Depth => match token.parse::<usize>() {
+                            Ok(depth) => self.depth = depth,
+                            _ => {
+                                warn!("could not parse depth from {}", token)
+                            }
+                        },
+                        ParsingState::Nodes => match token.parse::<u64>() {
+                            Ok(nodes) => self.nodes = nodes,
+                            _ => {
+                                warn!("could not parse nodes from {}", token)
+                            }
+                        },
+                        ParsingState::Nps => match token.parse::<u64>() {
+                            Ok(nps) => self.nps = nps,
+                            _ => {
+                                warn!("could not parse nps from {}", token)
+                            }
+                        },
+                        ParsingState::Time => match token.parse::<usize>() {
+                            Ok(time) => self.time = time,
+                            _ => {
+                                warn!("could not parse time from {}", token)
+                            }
+                        },
+                        ParsingState::ScoreCp => match token.parse::<i32>() {
+                            Ok(score_cp) => self.score = Score::Cp(score_cp),
+                            _ => {
+                                warn!("could not parse score cp from {}", token)
+                            }
+                        },
+                        ParsingState::ScoreMate => match token.parse::<i32>() {
+                            Ok(score_mate) => self.score = Score::Mate(score_mate),
+                            _ => {
+                                warn!("could not parse score mate from {}", token)
+                            }
+                        },
+                        ParsingState::PvBestmove => {
+                            pv_buff = pv_buff + token;
+
+                            self.bestmove = UciBuff::from(token);
+
+                            pv_on = true;
+
+                            ps = ParsingState::PvPonder
+                        }
+                        ParsingState::PvPonder => {
+                            pv_buff = pv_buff + " " + token;
+
+                            self.ponder = UciBuff::from(token);
+
+                            ps = ParsingState::PvRest
+                        }
+                        ParsingState::PvRest => pv_buff = pv_buff + " " + token,
+                        _ => {
+                            // should not happen
+                        }
+                    }
+
+                    if !pv_on {
+                        ps = ParsingState::Key;
+                    }
+                }
+            }
+        }
+
+        self.pv = PvBuff::from(pv_buff);
+    }
 }

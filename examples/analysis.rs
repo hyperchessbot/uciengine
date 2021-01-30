@@ -1,11 +1,20 @@
+extern crate env_logger;
+
 use uciengine::analysis::*;
 
 fn main() {
-    let ai = AnalysisInfo::new();
+    env_logger::init();
 
-    println!("ai {:?}", ai);
+    let mut ai = AnalysisInfo::new();
 
-    let ps = ParsingState::Init;
+    ai.parse("info depth 3 score mate 5 nodes 3000000000 time 3000 nps 1000000 pv e2e4 e7e5 g1f3");
 
-    println!("ps {:?}", ps);
+    println!("parsed ai {:?}", ai);
+
+    println!(
+        "bestmove {:?} ponder {:?} pv {:?}",
+        ai.bestmove(),
+        ai.ponder(),
+        ai.pv()
+    );
 }
