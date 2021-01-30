@@ -38,13 +38,21 @@
 //!    tokio::spawn(async move {
 //!        let go_result1 = engine_clone1.go(go_job1).await;
 //!
-//!        println!("go result 1 {:?} , analysis info {:?}", go_result1, engine_clone1.get_ai());
+//!        println!(
+//!            "go result 1 {:?} , analysis info {:?}",
+//!            go_result1,
+//!            engine_clone1.get_ai()
+//!        );
 //!    });
 //!
 //!    tokio::spawn(async move {
 //!        let go_result2 = engine_clone2.go(go_job2).await;
 //!
-//!        println!("go result 2 {:?} , analysis info {:?}", go_result2, engine_clone2.get_ai());
+//!        println!(
+//!            "go result 2 {:?} , analysis info {:?}",
+//!            go_result2,
+//!            engine_clone2.get_ai()
+//!        );
 //!    });
 //!
 //!    // wait enough for the go commands to complete in the background
