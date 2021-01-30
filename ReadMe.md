@@ -2,7 +2,7 @@
 
 [![documentation](https://docs.rs/uciengine/badge.svg)](https://docs.rs/uciengine) [![Crates.io](https://img.shields.io/crates/v/uciengine.svg)](https://crates.io/crates/uciengine) [![Crates.io (recent)](https://img.shields.io/crates/dr/uciengine)](https://crates.io/crates/uciengine)
 
-Rust uci engine wrapper. Allows doing multiple searches from parallel asyncs. Searches are queued and done one by one in a way opaque to the receiver of the result. Analysis mode / streaming results while searching is not supported. You issue a go / ponderhit / pondermiss command and await on bestmove / ponder. ( Pondermiss is a fancy name for awaited stop command, to reflect the use case of a failed ponder. ) Technically a go command without a position command ( `pos_startpos` or `pos_fen` ) is possible, but not recommended.
+Rust uci engine wrapper. Allows doing multiple searches from parallel asyncs. Searches are queued and done one by one in a way opaque to the receiver of the result. Analysis mode / streaming results while searching is not supported. You issue a go / ponderhit / pondermiss command and await on bestmove / ponder. ( Pondermiss is a fancy name for awaited stop command, to reflect the use case of a failed ponder. )
 
 # Usage
 

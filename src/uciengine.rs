@@ -61,8 +61,8 @@ pub struct Timecontrol {
 impl Timecontrol {
     /// create default time control
     /// ( one minute thinking time for both sides, no increment )
-    pub fn default() -> Timecontrol {
-        Timecontrol {
+    pub fn default() -> Self {
+        Self {
             wtime: 60000,
             winc: 0,
             btime: 60000,
@@ -73,9 +73,9 @@ impl Timecontrol {
 
 /// go command job implementation
 impl GoJob {
-    /// create new GoJob with reasonable defaults
-    pub fn new() -> GoJob {
-        GoJob {
+    /// create new GoJob with defaults
+    pub fn new() -> Self {
+        Self {
             pos_spec: No,
             pos_fen: None,
             pos_moves: None,
@@ -89,7 +89,9 @@ impl GoJob {
         }
     }
 
-    /// custom command
+    /// set custom command and return self,
+    /// if set, other settings will be ignored
+    /// and only this single command will be sent
     pub fn custom<T>(mut self, command: T) -> GoJob
     where
         T: core::fmt::Display,
@@ -99,7 +101,7 @@ impl GoJob {
         self
     }
 
-    /// to commands
+    /// conver go job to commands
     pub fn to_commands(&self) -> Vec<String> {
         let mut commands: Vec<String> = vec![];
 
@@ -162,36 +164,36 @@ impl GoJob {
         commands
     }
 
-    /// set ponder
-    pub fn set_ponder(mut self, value: bool) -> GoJob where {
+    /// set ponder and return self
+    pub fn set_ponder(mut self, value: bool) -> Self where {
         self.ponder = value;
 
         self
     }
 
-    /// ponder
-    pub fn ponder(mut self) -> GoJob where {
+    /// set ponder to true and return self
+    pub fn ponder(mut self) -> Self where {
         self.ponder = true;
 
         self
     }
 
-    /// ponderhit
-    pub fn ponderhit(mut self) -> GoJob where {
+    /// set ponderhit and return self
+    pub fn ponderhit(mut self) -> Self where {
         self.ponderhit = true;
 
         self
     }
 
-    /// pondermiss
-    pub fn pondermiss(mut self) -> GoJob where {
+    /// set pondermiss and return self
+    pub fn pondermiss(mut self) -> Self where {
         self.pondermiss = true;
 
         self
     }
 
     /// set position fen and return self
-    pub fn pos_fen<T>(mut self, fen: T) -> GoJob
+    pub fn pos_fen<T>(mut self, fen: T) -> Self
     where
         T: core::fmt::Display,
     {
@@ -202,14 +204,14 @@ impl GoJob {
     }
 
     /// set position startpos and return self
-    pub fn pos_startpos(mut self) -> GoJob {
+    pub fn pos_startpos(mut self) -> Self {
         self.pos_spec = Startpos;
 
         self
     }
 
     /// set position moves and return self
-    pub fn pos_moves<T>(mut self, moves: T) -> GoJob
+    pub fn pos_moves<T>(mut self, moves: T) -> Self
     where
         T: core::fmt::Display,
     {
@@ -219,7 +221,7 @@ impl GoJob {
     }
 
     /// set uci option as key value pair and return self
-    pub fn uci_opt<K, V>(mut self, key: K, value: V) -> GoJob
+    pub fn uci_opt<K, V>(mut self, key: K, value: V) -> Self
     where
         K: core::fmt::Display,
         V: core::fmt::Display,
@@ -231,7 +233,7 @@ impl GoJob {
     }
 
     /// set go option as key value pair and return self
-    pub fn go_opt<K, V>(mut self, key: K, value: V) -> GoJob
+    pub fn go_opt<K, V>(mut self, key: K, value: V) -> Self
     where
         K: core::fmt::Display,
         V: core::fmt::Display,
@@ -243,7 +245,7 @@ impl GoJob {
     }
 
     /// set time control and return self
-    pub fn tc(mut self, tc: Timecontrol) -> GoJob {
+    pub fn tc(mut self, tc: Timecontrol) -> Self {
         self.go_options
             .insert("wtime".to_string(), format!("{}", tc.wtime));
         self.go_options
@@ -300,8 +302,10 @@ impl UciEngine {
             .take()
             .expect("child did not have a handle to stdin");
 
+        // stdout reader
         let reader = BufReader::new(stdout).lines();
 
+        // channel for receiving bestmove result
         let (tx, rx) = mpsc::unbounded_channel::<String>();
 
         tokio::spawn(async move {
@@ -359,6 +363,7 @@ impl UciEngine {
             }
         });
 
+        // channel for sending go jobs
         let (gtx, grx) = mpsc::unbounded_channel::<GoJob>();
 
         tokio::spawn(async move {
@@ -423,7 +428,7 @@ impl UciEngine {
         std::sync::Arc::new(UciEngine { gtx: gtx })
     }
 
-    /// go
+    /// issue go command
     pub fn go(&self, go_job: GoJob) -> oneshot::Receiver<GoResult> {
         let mut go_job = go_job;
 

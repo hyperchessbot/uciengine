@@ -60,6 +60,5 @@
 //!}
 //!```
 
-
 // lib
 pub mod uciengine;
