@@ -15,7 +15,7 @@ def decorate(text, pre):
     return "\n".join([pre + line for line in text.split("\n")])
 
 
-example = read_file("src/example.rs")
+example = read_file("examples/example.rs")
 parts = read_file("src/lib.rs").split("// lib\n")
 
 lib = "//!\n//! # Examples\n//!\n//!\n//!```\n"
