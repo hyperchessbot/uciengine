@@ -390,3 +390,13 @@ fn set_trim() {
 
     assert_eq!(String::from(x), "e2e4 e7e5".to_string());
 }
+
+#[test]
+fn parse_error {
+	let mut ai = AnalysisInfo::new();
+
+    ai.parse("info depth 3 score mate 5 nodes 3000000000 time 3000 nps 1000000 pv e2e4 e7e5 g1f3");
+
+    assert_eq!(ai.depth, 3);
+    assert_eq!(ai.score, Score::Mate(5));
+}
