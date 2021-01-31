@@ -138,7 +138,10 @@ macro_rules! gen_str_buff {
 
 const UCI_MAX_LENGTH: usize = 5;
 const UCI_TYPICAL_LENGTH: usize = 4;
+#[cfg(not(test))]
 const MAX_PV_MOVES: usize = 10;
+#[cfg(test)]
+const MAX_PV_MOVES: usize = 2;
 const PV_BUFF_SIZE: usize = MAX_PV_MOVES * (UCI_TYPICAL_LENGTH + 1);
 
 gen_str_buff!(
@@ -392,11 +395,14 @@ fn set_trim() {
 }
 
 #[test]
-fn parse_error {
-	let mut ai = AnalysisInfo::new();
+fn parse_error() {
+    let mut ai = AnalysisInfo::new();
 
-    ai.parse("info depth 3 score mate 5 nodes 3000000000 time 3000 nps 1000000 pv e2e4 e7e5 g1f3");
+    let _ = ai.parse(
+        "info depth 3 score mate 5 nodes 3000000000 time 3000 nps 1000000 pv e2e4 e7e5 g1f3",
+    );
 
     assert_eq!(ai.depth, 3);
-    assert_eq!(ai.score, Score::Mate(5));
+    assert_eq!(format!("{:?}", ai.score), format!("{:?}", Score::Mate(5)));
+    assert_eq!(format!("{:?}", ai.ponder()), format!("{:?}", Some("e7e5")));
 }
