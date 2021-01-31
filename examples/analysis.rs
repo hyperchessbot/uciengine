@@ -17,4 +17,12 @@ fn main() {
         ai.ponder(),
         ai.pv()
     );
+
+    let mut x = PvBuff::new().set("e2e4");
+
+    println!("x = {:?}", x);
+
+    x.set_trim("e2e4 e7e5 g1f3 b8c6", ' ');
+
+    println!("x = {:?}", x);
 }

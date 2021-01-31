@@ -10,7 +10,7 @@ macro_rules! gen_str_buff {
 		}
 
 		impl $type {
-			fn new() -> Self {
+			pub fn new() -> Self {
 				Self {
 					len: 0,
 					buff: [0; $size]
@@ -24,12 +24,49 @@ macro_rules! gen_str_buff {
 
 				Some(String::from(self))
 			}
+
+			pub fn set<T: AsRef<str>>(&mut self, value: T) -> Self {
+				let bytes = value.as_ref().as_bytes();
+
+				let mut len = bytes.len();
+
+				if len > $size{
+					len = $size;
+				}
+
+				self.len = len;
+
+				self.buff[0..len].copy_from_slice(&bytes[0..len]);
+
+				*self
+			}
+
+			pub fn set_trim<T: AsRef<str>>(&mut self, value: T, trim: char) -> Self {
+				let value_ref = value.as_ref();
+				let value_string = value_ref.to_string();
+				let bytes = value_ref.as_bytes();
+
+				let mut total_len = value_string.len();
+
+			    value_ref.to_string().chars().rev().take_while(|c| {
+			        total_len -= 1;
+			        ( *c != trim ) || ( total_len > $size )
+			    }).collect::<String>().len();
+
+			    self.len = total_len;
+
+			    self.buff[0..total_len].copy_from_slice(&bytes[0..total_len]);
+
+				*self
+			}
 		}
 
 		impl std::convert::From<&str> for $type {
 			fn from(value: &str) -> Self {
 				let bytes = value.as_bytes();
+
 				let mut len = bytes.len();
+
 				if len > $size{
 					len = $size;
 				}
@@ -63,7 +100,7 @@ macro_rules! gen_str_buff {
 
 		impl std::fmt::Debug for $type {
 			fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-		        write!(f, "[{}: '{}']", stringify!($type), String::from(*self))
+		        write!(f, "[{}[{}]: '{}']", stringify!($type), self.len, String::from(*self))
 		    }
 		}
 	)* }
@@ -71,7 +108,7 @@ macro_rules! gen_str_buff {
 
 const UCI_MAX_LENGTH: usize = 5;
 const UCI_TYPICAL_LENGTH: usize = 4;
-const MAX_PV_MOVES: usize = 10;
+const MAX_PV_MOVES: usize = 2;
 const PV_BUFF_SIZE: usize = MAX_PV_MOVES * (UCI_TYPICAL_LENGTH + 1);
 
 gen_str_buff!(
