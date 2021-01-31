@@ -1,4 +1,28 @@
-use log::warn;
+use log::{error, warn};
+
+use thiserror::Error;
+
+#[derive(Error, Debug)]
+pub enum InfoParseError {
+    #[error("could not parse number for key '{0}' from info")]
+    ParseNumberError(String),
+    #[error("invalid info key '{0}'")]
+    InvalidKeyError(String),
+    #[error("invalid score specifier '{0}'")]
+    InvalidScoreSpecifier(String),
+}
+
+pub fn info_parse_error(err: InfoParseError) -> Result<(), InfoParseError> {
+    error!("{:?}", err);
+
+    Err(err)
+}
+
+pub fn parse_number_error<T: AsRef<str>>(key: T) -> Result<(), InfoParseError> {
+    let key = key.as_ref().to_string();
+
+    info_parse_error(InfoParseError::ParseNumberError(key))
+}
 
 macro_rules! gen_str_buff {
 	($(#[$attr:meta] => $type:ident, $size:expr),*) => { $(
@@ -37,6 +61,12 @@ macro_rules! gen_str_buff {
 				self.len = len;
 
 				self.buff[0..len].copy_from_slice(&bytes[0..len]);
+
+				*self
+			}
+
+			pub fn reset(&mut self) -> Self {
+				self.len = 0;
 
 				*self
 			}
@@ -108,7 +138,7 @@ macro_rules! gen_str_buff {
 
 const UCI_MAX_LENGTH: usize = 5;
 const UCI_TYPICAL_LENGTH: usize = 4;
-const MAX_PV_MOVES: usize = 2;
+const MAX_PV_MOVES: usize = 10;
 const PV_BUFF_SIZE: usize = MAX_PV_MOVES * (UCI_TYPICAL_LENGTH + 1);
 
 gen_str_buff!(
@@ -210,11 +240,12 @@ impl AnalysisInfo {
     }
 
     /// parse info string
-    pub fn parse<T: std::convert::AsRef<str>>(&mut self, info: T) {
+    pub fn parse<T: std::convert::AsRef<str>>(&mut self, info: T) -> Result<(), InfoParseError> {
         let info = info.as_ref();
         let mut ps = ParsingState::Info;
         let mut pv_buff = String::new();
         let mut pv_on = false;
+        let mut first_string = true;
 
         for token in info.split(" ") {
             match ps {
@@ -223,15 +254,19 @@ impl AnalysisInfo {
                         "info" => ps = ParsingState::Key,
                         _ => {
                             // not an info
-                            return;
+                            return Ok(());
                         }
                     }
                 }
                 ParsingState::Key => {
                     if token == "string" {
-                        // anything starting with 'info string' is not analysis info
-                        // occuring later in key position 'string' is not a valid analysis info token
-                        return;
+                        // anything starting with 'info string' is not analysis info rather verbal information to user
+                        if first_string {
+                            return Ok(());
+                        } else {
+                            // occuring later in key position 'string' is not a valid analysis info token
+                            return Err(InfoParseError::InvalidKeyError(token.to_string()));
+                        }
                     }
 
                     ps = match token {
@@ -244,6 +279,8 @@ impl AnalysisInfo {
                         "nps" => ParsingState::Nps,
                         "score" => ParsingState::Score,
                         "pv" => ParsingState::PvBestmove,
+                        // don't hang parsing at unknown token for the moment
+                        // TODO: consider making this an error
                         _ => ParsingState::Unknown,
                     }
                 }
@@ -251,75 +288,61 @@ impl AnalysisInfo {
                     "cp" => ps = ParsingState::ScoreCp,
                     "mate" => ps = ParsingState::ScoreMate,
                     _ => {
-                        warn!("invalid score specifier {}", token);
-
-                        return;
+                        return info_parse_error(InfoParseError::InvalidScoreSpecifier(
+                            token.to_string(),
+                        ));
                     }
                 },
                 ParsingState::Unknown => {
-                    // ignore this token and hope for the best
+                    // ignore this token and hope for the best ( namely that it had a single token arg )
+                    warn!("unknown info key {}", token);
+
                     ps = ParsingState::Key
                 }
                 _ => {
                     match ps {
                         ParsingState::Multipv => match token.parse::<usize>() {
                             Ok(multipv) => self.multipv = multipv,
-                            _ => {
-                                warn!("could not parse multipv from {}", token)
-                            }
+                            _ => return parse_number_error(token),
                         },
                         ParsingState::Depth => match token.parse::<usize>() {
                             Ok(depth) => self.depth = depth,
-                            _ => {
-                                warn!("could not parse depth from {}", token)
-                            }
+                            _ => return parse_number_error(token),
                         },
                         ParsingState::Seldepth => match token.parse::<usize>() {
                             Ok(seldepth) => self.seldepth = seldepth,
-                            _ => {
-                                warn!("could not parse seldepth from {}", token)
-                            }
+                            _ => return parse_number_error(token),
                         },
                         ParsingState::Tbhits => match token.parse::<u64>() {
                             Ok(tbhits) => self.tbhits = tbhits,
-                            _ => {
-                                warn!("could not parse tbhits from {}", token)
-                            }
+                            _ => return parse_number_error(token),
                         },
                         ParsingState::Nodes => match token.parse::<u64>() {
                             Ok(nodes) => self.nodes = nodes,
-                            _ => {
-                                warn!("could not parse nodes from {}", token)
-                            }
+                            _ => return parse_number_error(token),
                         },
                         ParsingState::Nps => match token.parse::<u64>() {
                             Ok(nps) => self.nps = nps,
-                            _ => {
-                                warn!("could not parse nps from {}", token)
-                            }
+                            _ => return parse_number_error(token),
                         },
                         ParsingState::Time => match token.parse::<usize>() {
                             Ok(time) => self.time = time,
-                            _ => {
-                                warn!("could not parse time from {}", token)
-                            }
+                            _ => return parse_number_error(token),
                         },
                         ParsingState::ScoreCp => match token.parse::<i32>() {
                             Ok(score_cp) => self.score = Score::Cp(score_cp),
-                            _ => {
-                                warn!("could not parse score cp from {}", token)
-                            }
+                            _ => return parse_number_error(token),
                         },
                         ParsingState::ScoreMate => match token.parse::<i32>() {
                             Ok(score_mate) => self.score = Score::Mate(score_mate),
-                            _ => {
-                                warn!("could not parse score mate from {}", token)
-                            }
+                            _ => return parse_number_error(token),
                         },
                         ParsingState::PvBestmove => {
                             pv_buff = pv_buff + token;
 
                             self.bestmove = UciBuff::from(token);
+
+                            self.ponder.reset();
 
                             pv_on = true;
 
@@ -343,8 +366,27 @@ impl AnalysisInfo {
                     }
                 }
             }
+
+            first_string = false;
         }
 
-        self.pv = PvBuff::from(pv_buff);
+        self.pv.set_trim(pv_buff, ' ');
+
+        Ok(())
     }
+}
+
+#[test]
+fn set_trim() {
+    let mut x = PvBuff::new().set("e2e4");
+
+    assert_eq!(x.len, 4);
+
+    assert_eq!(String::from(x), "e2e4".to_string());
+
+    x.set_trim("e2e4 e7e5 g1f3 b8c6", ' ');
+
+    assert_eq!(x.len, 9);
+
+    assert_eq!(String::from(x), "e2e4 e7e5".to_string());
 }

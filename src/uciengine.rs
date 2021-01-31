@@ -219,6 +219,8 @@ impl GoJob {
     ///
     /// ### Example
     /// ```
+    /// use uciengine::uciengine::GoJob;
+    ///
     /// let go_job = GoJob::new()
     ///                .pos_startpos()
     ///                .pos_moves("e2e4 e7e5 g1f3");
@@ -354,7 +356,7 @@ impl UciEngine {
                             {
                                 let mut ai = ai.lock().unwrap();
 
-                                ai.parse(line.to_owned());
+                                let _ = ai.parse(line.to_owned());
 
                                 debug!("{:?}", ai);
                             }
