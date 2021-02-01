@@ -9,6 +9,8 @@ use thiserror::Error;
 pub enum InfoParseError {
     #[error("could not parse number for key '{0}' from info")]
     ParseNumberError(String),
+    #[error("could not parse move for key '{0}' from info")]
+    ParseMoveError(String),
     #[error("invalid info key '{0}'")]
     InvalidKeyError(String),
     #[error("invalid score specifier '{0}'")]
@@ -202,6 +204,17 @@ pub enum Score {
     Mate(i32),
 }
 
+/// score type
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+pub enum ScoreType {
+    /// exact
+    Exact,
+    /// lowerbound
+    Lowerbound,
+    /// upperbound
+    Upperbound,
+}
+
 /// analysis info
 #[derive(Debug, Clone, Copy)]
 pub struct AnalysisInfo {
@@ -213,22 +226,32 @@ pub struct AnalysisInfo {
     ponder: UciBuff,
     /// pv
     pv: PvBuff,
-    /// multipv
-    pub multipv: usize,
     /// depth
     pub depth: usize,
     /// seldepth
     pub seldepth: usize,
-    /// tbhits
-    pub tbhits: u64,
-    /// nodes
-    pub nodes: u64,
     /// time
     pub time: usize,
-    /// nodes per second
-    pub nps: u64,
+    /// nodes
+    pub nodes: u64,
+    /// multipv
+    pub multipv: usize,
     /// score ( centipawns or mate )
     pub score: Score,
+    /// current move
+    pub currmove: UciBuff,
+    /// current move number
+    pub currmovenumber: usize,
+    /// hashfull
+    pub hashfull: usize,
+    /// nodes per second
+    pub nps: u64,
+    /// tbhits
+    pub tbhits: u64,
+    /// cpuload
+    pub cpuload: usize,
+    /// score type
+    pub scoretype: ScoreType,
 }
 
 /// analysis info serde
@@ -244,22 +267,32 @@ pub struct AnalysisInfoSerde {
     pub ponder: Option<String>,
     /// pv
     pub pv: Option<String>,
-    /// multipv
-    pub multipv: usize,
     /// depth
     pub depth: usize,
     /// seldepth
     pub seldepth: usize,
-    /// tbhits
-    pub tbhits: u64,
-    /// nodes
-    pub nodes: u64,
     /// time
     pub time: usize,
-    /// nodes per second
-    pub nps: u64,
+    /// nodes
+    pub nodes: u64,
+    /// multipv
+    pub multipv: usize,
     /// score ( centipawns or mate )
     pub score: Score,
+    /// current move
+    pub currmove: Option<String>,
+    /// current move number
+    pub currmovenumber: usize,
+    /// hashfull
+    pub hashfull: usize,
+    /// nodes per second
+    pub nps: u64,
+    /// tbhits
+    pub tbhits: u64,
+    /// cpuload
+    pub cpuload: usize,
+    /// score type
+    pub scoretype: ScoreType,
 }
 
 /// parsing state
@@ -270,16 +303,20 @@ pub enum ParsingState {
     Info,
     Key,
     Unknown,
-    Multipv,
     Depth,
     Seldepth,
-    Tbhits,
-    Nodes,
     Time,
-    Nps,
+    Nodes,
+    Multipv,
     Score,
     ScoreCp,
     ScoreMate,
+    Currmove,
+    Currmovenumber,
+    Hashfull,
+    Nps,
+    Tbhits,
+    Cpuload,
     PvBestmove,
     PvPonder,
     PvRest,
@@ -294,14 +331,19 @@ impl AnalysisInfo {
             bestmove: UciBuff::new(),
             ponder: UciBuff::new(),
             pv: PvBuff::new(),
-            multipv: 0,
             depth: 0,
             seldepth: 0,
-            tbhits: 0,
-            nodes: 0,
             time: 0,
-            nps: 0,
+            nodes: 0,
+            multipv: 0,
             score: Score::Cp(0),
+            currmove: UciBuff::new(),
+            currmovenumber: 0,
+            hashfull: 0,
+            nps: 0,
+            tbhits: 0,
+            cpuload: 0,
+            scoretype: ScoreType::Exact,
         }
     }
 
@@ -313,14 +355,19 @@ impl AnalysisInfo {
             bestmove: self.bestmove(),
             ponder: self.ponder(),
             pv: self.pv(),
-            multipv: self.multipv,
             depth: self.depth,
             seldepth: self.seldepth,
-            tbhits: self.tbhits,
-            nodes: self.nodes,
             time: self.time,
-            nps: self.nps,
+            nodes: self.nodes,
+            multipv: self.multipv,
             score: self.score,
+            currmove: self.currmove(),
+            currmovenumber: self.currmovenumber,
+            hashfull: self.hashfull,
+            nps: self.nps,
+            tbhits: self.tbhits,
+            cpuload: self.cpuload,
+            scoretype: self.scoretype,
         }
     }
 
@@ -331,14 +378,19 @@ impl AnalysisInfo {
             bestmove: UciBuff::from(ais.bestmove),
             ponder: UciBuff::from(ais.ponder),
             pv: PvBuff::from(ais.pv),
-            multipv: ais.multipv,
             depth: ais.depth,
             seldepth: ais.seldepth,
-            tbhits: ais.tbhits,
-            nodes: ais.nodes,
             time: ais.time,
-            nps: ais.nps,
+            nodes: ais.nodes,
+            multipv: ais.multipv,
             score: ais.score,
+            currmove: UciBuff::from(ais.currmove),
+            currmovenumber: ais.currmovenumber,
+            hashfull: ais.hashfull,
+            nps: ais.nps,
+            tbhits: ais.tbhits,
+            cpuload: ais.cpuload,
+            scoretype: ais.scoretype,
         }
     }
 
@@ -370,13 +422,17 @@ impl AnalysisInfo {
         self.pv.to_opt()
     }
 
+    // get current move
+    pub fn currmove(self) -> Option<String> {
+        self.currmove.to_opt()
+    }
+
     /// parse info string
     pub fn parse<T: std::convert::AsRef<str>>(&mut self, info: T) -> Result<(), InfoParseError> {
         let info = info.as_ref();
         let mut ps = ParsingState::Info;
         let mut pv_buff = String::new();
         let mut pv_on = false;
-        let mut first_string = true;
 
         for token in info.split(" ") {
             match ps {
@@ -390,29 +446,42 @@ impl AnalysisInfo {
                     }
                 }
                 ParsingState::Key => {
-                    if token == "string" {
-                        // anything starting with 'info string' is not analysis info rather verbal information to user
-                        if first_string {
-                            return Ok(());
-                        } else {
-                            // occuring later in key position 'string' is not a valid analysis info token
-                            return Err(InfoParseError::InvalidKeyError(token.to_string()));
-                        }
+                    if (token == "string") || (token == "refutation") || (token == "currline") {
+                        // string, refutation and currline are not supported
+                        return Ok(());
                     }
 
                     ps = match token {
-                        "multipv" => ParsingState::Multipv,
+                        "lowerbound" => {
+                            self.scoretype = ScoreType::Lowerbound;
+
+                            ParsingState::Key
+                        }
+                        "upperbound" => {
+                            self.scoretype = ScoreType::Upperbound;
+
+                            ParsingState::Key
+                        }
                         "depth" => ParsingState::Depth,
                         "seldepth" => ParsingState::Seldepth,
-                        "tbhits" => ParsingState::Tbhits,
-                        "nodes" => ParsingState::Nodes,
                         "time" => ParsingState::Time,
-                        "nps" => ParsingState::Nps,
+                        "nodes" => ParsingState::Nodes,
+                        "multipv" => ParsingState::Multipv,
                         "score" => ParsingState::Score,
+                        "currmove" => ParsingState::Currmove,
+                        "currmovenumber" => ParsingState::Currmovenumber,
+                        "hashfull" => ParsingState::Hashfull,
+                        "nps" => ParsingState::Nps,
+                        "tbhits" => ParsingState::Tbhits,
+                        "cpuload" => ParsingState::Cpuload,
                         "pv" => ParsingState::PvBestmove,
                         // don't hang parsing at unknown token for the moment
                         // TODO: consider making this an error
                         _ => ParsingState::Unknown,
+                    };
+
+                    if let ParsingState::Score = ps {
+                        self.scoretype = ScoreType::Exact;
                     }
                 }
                 ParsingState::Score => match token {
@@ -433,10 +502,6 @@ impl AnalysisInfo {
                 }
                 _ => {
                     match ps {
-                        ParsingState::Multipv => match token.parse::<usize>() {
-                            Ok(multipv) => self.multipv = multipv,
-                            _ => return parse_number_error(token),
-                        },
                         ParsingState::Depth => match token.parse::<usize>() {
                             Ok(depth) => self.depth = depth,
                             _ => return parse_number_error(token),
@@ -445,20 +510,16 @@ impl AnalysisInfo {
                             Ok(seldepth) => self.seldepth = seldepth,
                             _ => return parse_number_error(token),
                         },
-                        ParsingState::Tbhits => match token.parse::<u64>() {
-                            Ok(tbhits) => self.tbhits = tbhits,
+                        ParsingState::Time => match token.parse::<usize>() {
+                            Ok(time) => self.time = time,
                             _ => return parse_number_error(token),
                         },
                         ParsingState::Nodes => match token.parse::<u64>() {
                             Ok(nodes) => self.nodes = nodes,
                             _ => return parse_number_error(token),
                         },
-                        ParsingState::Nps => match token.parse::<u64>() {
-                            Ok(nps) => self.nps = nps,
-                            _ => return parse_number_error(token),
-                        },
-                        ParsingState::Time => match token.parse::<usize>() {
-                            Ok(time) => self.time = time,
+                        ParsingState::Multipv => match token.parse::<usize>() {
+                            Ok(multipv) => self.multipv = multipv,
                             _ => return parse_number_error(token),
                         },
                         ParsingState::ScoreCp => match token.parse::<i32>() {
@@ -467,6 +528,31 @@ impl AnalysisInfo {
                         },
                         ParsingState::ScoreMate => match token.parse::<i32>() {
                             Ok(score_mate) => self.score = Score::Mate(score_mate),
+                            _ => return parse_number_error(token),
+                        },
+                        ParsingState::Currmove => {
+                            self.currmove.set(token);
+
+                            ()
+                        }
+                        ParsingState::Currmovenumber => match token.parse::<usize>() {
+                            Ok(currmovenumber) => self.currmovenumber = currmovenumber,
+                            _ => return parse_number_error(token),
+                        },
+                        ParsingState::Hashfull => match token.parse::<usize>() {
+                            Ok(hashfull) => self.hashfull = hashfull,
+                            _ => return parse_number_error(token),
+                        },
+                        ParsingState::Nps => match token.parse::<u64>() {
+                            Ok(nps) => self.nps = nps,
+                            _ => return parse_number_error(token),
+                        },
+                        ParsingState::Tbhits => match token.parse::<u64>() {
+                            Ok(tbhits) => self.tbhits = tbhits,
+                            _ => return parse_number_error(token),
+                        },
+                        ParsingState::Cpuload => match token.parse::<usize>() {
+                            Ok(cpuload) => self.cpuload = cpuload,
                             _ => return parse_number_error(token),
                         },
                         ParsingState::PvBestmove => {
@@ -500,8 +586,6 @@ impl AnalysisInfo {
                     }
                 }
             }
-
-            first_string = false;
         }
 
         self.pv.set_trim(pv_buff, ' ');

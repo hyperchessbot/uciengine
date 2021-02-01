@@ -10,7 +10,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .uci_opt("UCI_Variant", "chess")
         .pos_startpos()
         .pos_moves("e2e4 e7e5")
-        .go_opt("depth", 10);
+        .go_opt("depth", 24);
 
     let engine = UciEngine::new("stockfish12.exe");
 
