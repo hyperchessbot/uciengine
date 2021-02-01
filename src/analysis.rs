@@ -9,8 +9,6 @@ use thiserror::Error;
 pub enum InfoParseError {
     #[error("could not parse number for key '{0}' from info")]
     ParseNumberError(String),
-    #[error("could not parse move for key '{0}' from info")]
-    ParseMoveError(String),
     #[error("invalid info key '{0}'")]
     InvalidKeyError(String),
     #[error("invalid score specifier '{0}'")]
