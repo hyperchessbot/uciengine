@@ -1,2 +1,3 @@
 cargo fmt
+
 cargo build
