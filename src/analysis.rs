@@ -2,6 +2,7 @@ use log::{error, warn};
 
 use thiserror::Error;
 
+/// InfoParseError captures possible info parsing errors
 #[derive(Error, Debug)]
 pub enum InfoParseError {
     #[error("could not parse number for key '{0}' from info")]
@@ -12,18 +13,21 @@ pub enum InfoParseError {
     InvalidScoreSpecifier(String),
 }
 
+/// log info parse error and return it as a result
 pub fn info_parse_error(err: InfoParseError) -> Result<(), InfoParseError> {
     error!("{:?}", err);
 
     Err(err)
 }
 
+/// log parse number error and return it as a result
 pub fn parse_number_error<T: AsRef<str>>(key: T) -> Result<(), InfoParseError> {
     let key = key.as_ref().to_string();
 
     info_parse_error(InfoParseError::ParseNumberError(key))
 }
 
+/// generate string buffer with given name and size
 macro_rules! gen_str_buff {
 	($(#[$attr:meta] => $type:ident, $size:expr),*) => { $(
 	    #[$attr]
@@ -33,7 +37,11 @@ macro_rules! gen_str_buff {
 			pub buff: [u8; $size],
 		}
 
+		#[$attr]
+		#[doc = "implementation"]
 		impl $type {
+			#[doc = "create new"]
+			#[$attr]
 			pub fn new() -> Self {
 				Self {
 					len: 0,
@@ -41,6 +49,9 @@ macro_rules! gen_str_buff {
 				}
 			}
 
+			#[doc = "convert"]
+			#[$attr]
+			#[doc = "to option ( None if empty, Some(contents) otherwise )"]
 			pub fn to_opt(self) -> Option<String> {
 				if self.len == 0 {
 					return None;
@@ -49,6 +60,9 @@ macro_rules! gen_str_buff {
 				Some(String::from(self))
 			}
 
+			#[doc = "set"]
+			#[$attr]
+			#[doc = "( value will be trimmed to buffer size )"]
 			pub fn set<T: AsRef<str>>(&mut self, value: T) -> Self {
 				let bytes = value.as_ref().as_bytes();
 
@@ -65,6 +79,9 @@ macro_rules! gen_str_buff {
 				*self
 			}
 
+			#[doc = "reset"]
+			#[$attr]
+			#[doc = "to empty buffer"]
 			pub fn reset(&mut self) -> Self {
 				self.len = 0;
 
@@ -91,6 +108,8 @@ macro_rules! gen_str_buff {
 			}
 		}
 
+		#[doc = "implement From<&str> for"]
+		#[$attr]
 		impl std::convert::From<&str> for $type {
 			fn from(value: &str) -> Self {
 				let bytes = value.as_bytes();
@@ -110,24 +129,33 @@ macro_rules! gen_str_buff {
 			}
 		}
 
+		#[doc = "implement From<String> for"]
+		#[$attr]
 		impl std::convert::From<String> for $type {
 			fn from(value: String) -> Self {
 				Self::from(value.as_str())
 			}
 		}
 
+		#[doc = "implement From<"]
+		#[$attr]
+		#[doc = "> for String"]
 		impl std::convert::From<$type> for String {
 			fn from(buff: $type) -> String {
 				std::str::from_utf8(&buff.buff[0..buff.len]).unwrap().to_string()
 			}
 		}
 
+		#[doc = "implement Display for"]
+		#[$attr]
 		impl std::fmt::Display for $type {
 			fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
 		        write!(f, "{}", String::from(*self))
 		    }
 		}
 
+		#[doc = "implement Debug for"]
+		#[$attr]
 		impl std::fmt::Debug for $type {
 			fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
 		        write!(f, "[{}[{}]: '{}']", stringify!($type), self.len, String::from(*self))
@@ -136,12 +164,16 @@ macro_rules! gen_str_buff {
 	)* }
 }
 
+/// maximum length of uci move
 const UCI_MAX_LENGTH: usize = 5;
+/// typical length of uci move
 const UCI_TYPICAL_LENGTH: usize = 4;
+/// maximum number of pv moves to store
 #[cfg(not(test))]
 const MAX_PV_MOVES: usize = 10;
 #[cfg(test)]
 const MAX_PV_MOVES: usize = 2;
+/// pv buffer size
 const PV_BUFF_SIZE: usize = MAX_PV_MOVES * (UCI_TYPICAL_LENGTH + 1);
 
 gen_str_buff!(
@@ -154,7 +186,9 @@ gen_str_buff!(
 /// score
 #[derive(Debug, Clone, Copy)]
 pub enum Score {
+    /// centipawn
     Cp(i32),
+    /// mate
     Mate(i32),
 }
 
@@ -294,6 +328,7 @@ impl AnalysisInfo {
                     "cp" => ps = ParsingState::ScoreCp,
                     "mate" => ps = ParsingState::ScoreMate,
                     _ => {
+                        // not a valid score specifier
                         return info_parse_error(InfoParseError::InvalidScoreSpecifier(
                             token.to_string(),
                         ));
@@ -367,6 +402,8 @@ impl AnalysisInfo {
                         }
                     }
 
+                    // anything from key pv onwards should be added to pv
+                    // otherwise switch back to parsing key
                     if !pv_on {
                         ps = ParsingState::Key;
                     }
