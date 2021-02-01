@@ -1,5 +1,7 @@
 use log::{error, warn};
 
+use serde::{Deserialize, Serialize};
+
 use thiserror::Error;
 
 /// InfoParseError captures possible info parsing errors
@@ -137,6 +139,14 @@ macro_rules! gen_str_buff {
 			}
 		}
 
+		#[doc = "implement From<Option<String>> for"]
+		#[$attr]
+		impl std::convert::From<Option<String>> for $type {
+			fn from(value: Option<String>) -> Self {
+				Self::from(value.unwrap_or(String::new()).as_str())
+			}
+		}
+
 		#[doc = "implement From<"]
 		#[$attr]
 		#[doc = "> for String"]
@@ -184,7 +194,7 @@ gen_str_buff!(
 );
 
 /// score
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 pub enum Score {
     /// centipawn
     Cp(i32),
@@ -203,6 +213,37 @@ pub struct AnalysisInfo {
     ponder: UciBuff,
     /// pv
     pv: PvBuff,
+    /// multipv
+    pub multipv: usize,
+    /// depth
+    pub depth: usize,
+    /// seldepth
+    pub seldepth: usize,
+    /// tbhits
+    pub tbhits: u64,
+    /// nodes
+    pub nodes: u64,
+    /// time
+    pub time: usize,
+    /// nodes per second
+    pub nps: u64,
+    /// score ( centipawns or mate )
+    pub score: Score,
+}
+
+/// analysis info serde
+#[derive(Debug, Serialize, Deserialize)]
+pub struct AnalysisInfoSerde {
+    /// disposition
+    pub disposition: String,
+    /// false for ongoing analysis, true when analysis stopped on bestmove received
+    pub done: bool,
+    /// best move
+    pub bestmove: Option<String>,
+    /// ponder
+    pub ponder: Option<String>,
+    /// pv
+    pub pv: Option<String>,
     /// multipv
     pub multipv: usize,
     /// depth
@@ -262,6 +303,56 @@ impl AnalysisInfo {
             nps: 0,
             score: Score::Cp(0),
         }
+    }
+
+    /// to serde
+    pub fn to_serde(self) -> AnalysisInfoSerde {
+        AnalysisInfoSerde {
+            disposition: "AnalysisInfo".to_string(),
+            done: self.done,
+            bestmove: self.bestmove(),
+            ponder: self.ponder(),
+            pv: self.pv(),
+            multipv: self.multipv,
+            depth: self.depth,
+            seldepth: self.seldepth,
+            tbhits: self.tbhits,
+            nodes: self.nodes,
+            time: self.time,
+            nps: self.nps,
+            score: self.score,
+        }
+    }
+
+    /// from serde
+    pub fn from_serde(ais: AnalysisInfoSerde) -> Self {
+        Self {
+            done: ais.done,
+            bestmove: UciBuff::from(ais.bestmove),
+            ponder: UciBuff::from(ais.ponder),
+            pv: PvBuff::from(ais.pv),
+            multipv: ais.multipv,
+            depth: ais.depth,
+            seldepth: ais.seldepth,
+            tbhits: ais.tbhits,
+            nodes: ais.nodes,
+            time: ais.time,
+            nps: ais.nps,
+            score: ais.score,
+        }
+    }
+
+    /// from json
+    pub fn from_json(json: &str) -> Result<Self, serde_json::Error> {
+        match serde_json::from_str::<AnalysisInfoSerde>(json) {
+            Ok(ais) => Ok(AnalysisInfo::from_serde(ais)),
+            Err(err) => Err(err),
+        }
+    }
+
+    /// to json
+    pub fn to_json(self) -> Result<String, serde_json::Error> {
+        serde_json::to_string(&self.to_serde())
     }
 
     // get bestmove
