@@ -287,7 +287,8 @@ pub struct GoResult {
 /// uci engine
 pub struct UciEngine {
     gtx: mpsc::UnboundedSender<GoJob>,
-    ai: std::sync::Arc<std::sync::Mutex<AnalysisInfo>>,
+    pub ai: std::sync::Arc<std::sync::Mutex<AnalysisInfo>>,
+    pub atx: std::sync::Arc<broadcast::Sender<AnalysisInfo>>,
 }
 
 /// uci engine implementation
@@ -341,9 +342,16 @@ impl UciEngine {
 
         let ai_clone = ai.clone();
 
+        let (atx, _) = broadcast::channel::<AnalysisInfo>(20);
+
+        let atx = std::sync::Arc::new(atx);
+
+        let atx_clone = atx.clone();
+
         tokio::spawn(async move {
             let mut reader = reader;
             let ai = ai_clone;
+            let atx = atx_clone;
 
             loop {
                 match reader.next_line().await {
@@ -353,21 +361,35 @@ impl UciEngine {
                                 debug!("uci engine out : {}", line);
                             }
 
+                            let mut is_bestmove = line.len() >= 8;
+
+                            if is_bestmove {
+                                is_bestmove = &line[0..8] == "bestmove";
+                            }
+
                             {
                                 let mut ai = ai.lock().unwrap();
 
-                                let _ = ai.parse(line.to_owned());
+                                let parse_result = ai.parse(line.to_owned());
 
-                                debug!("{:?}", ai);
+                                if is_bestmove {
+                                    ai.done = true;
+                                }
+
+                                debug!("parse result {:?} , ai {:?}", parse_result, ai);
+
+                                if parse_result.is_ok() {
+                                    let send_result = atx.send(*ai);
+
+                                    debug!("send ai result {:?}", send_result);
+                                }
                             }
 
-                            if line.len() >= 8 {
-                                if &line[0..8] == "bestmove" {
-                                    let send_result = tx.send(line);
+                            if is_bestmove {
+                                let send_result = tx.send(line);
 
-                                    if log_enabled!(Level::Debug) {
-                                        debug!("send bestmove result {:?}", send_result);
-                                    }
+                                if log_enabled!(Level::Debug) {
+                                    debug!("send bestmove result {:?}", send_result);
                                 }
                             }
                         } else {
@@ -473,7 +495,11 @@ impl UciEngine {
             info!("spawned uci engine : {}", path);
         }
 
-        std::sync::Arc::new(UciEngine { gtx: gtx, ai: ai })
+        std::sync::Arc::new(UciEngine {
+            gtx: gtx,
+            ai: ai,
+            atx: atx,
+        })
     }
 
     /// get analysis info

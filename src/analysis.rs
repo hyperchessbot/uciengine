@@ -161,6 +161,8 @@ pub enum Score {
 /// analysis info
 #[derive(Debug, Clone, Copy)]
 pub struct AnalysisInfo {
+    /// false for ongoing analysis, true when analysis stopped on bestmove received
+    pub done: bool,
     /// best move
     bestmove: UciBuff,
     /// ponder
@@ -213,6 +215,7 @@ impl AnalysisInfo {
     /// create new analysis info
     pub fn new() -> Self {
         Self {
+            done: false,
             bestmove: UciBuff::new(),
             ponder: UciBuff::new(),
             pv: PvBuff::new(),
