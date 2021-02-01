@@ -30,7 +30,7 @@ fn main() {
 
     ai = AnalysisInfo::new();
 
-    let _ = ai.parse("info depth 3 score mate 5 nodes 3000000000 time 3000 nps 1000000");
+    let _ = ai.parse("info depth 3 score mate 5 upperbound nodes 3000000000 time 3000 nps 1000000");
 
     if let Ok(json) = ai.to_json() {
         println!("ai as json {}", json);

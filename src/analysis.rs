@@ -554,6 +554,8 @@ impl AnalysisInfo {
                 ParsingState::Score => match token {
                     "cp" => ps = ParsingState::ScoreCp,
                     "mate" => ps = ParsingState::ScoreMate,
+                    "upperbound" => self.scoretype = ScoreType::Upperbound,
+                    "lowerbound" => self.scoretype = ScoreType::Lowerbound,
                     _ => {
                         // not a valid score specifier
                         return info_parse_error(InfoParseError::InvalidScoreSpecifier(
@@ -568,6 +570,8 @@ impl AnalysisInfo {
                     ps = ParsingState::Key
                 }
                 _ => {
+                    let mut keep_state = false;
+
                     match ps {
                         ParsingState::Depth => match token.parse::<usize>() {
                             Ok(depth) => self.depth = depth,
@@ -589,13 +593,37 @@ impl AnalysisInfo {
                             Ok(multipv) => self.multipv = multipv,
                             _ => return parse_number_error(token),
                         },
-                        ParsingState::ScoreCp => match token.parse::<i32>() {
-                            Ok(score_cp) => self.score = Score::Cp(score_cp),
-                            _ => return parse_number_error(token),
+                        ParsingState::ScoreCp => match token {
+                            "upperbound" => {
+                                self.scoretype = ScoreType::Upperbound;
+
+                                keep_state = true
+                            }
+                            "lowerbound" => {
+                                self.scoretype = ScoreType::Lowerbound;
+
+                                keep_state = true
+                            }
+                            _ => match token.parse::<i32>() {
+                                Ok(score_cp) => self.score = Score::Cp(score_cp),
+                                _ => return parse_number_error(token),
+                            },
                         },
-                        ParsingState::ScoreMate => match token.parse::<i32>() {
-                            Ok(score_mate) => self.score = Score::Mate(score_mate),
-                            _ => return parse_number_error(token),
+                        ParsingState::ScoreMate => match token {
+                            "upperbound" => {
+                                self.scoretype = ScoreType::Upperbound;
+
+                                keep_state = true
+                            }
+                            "lowerbound" => {
+                                self.scoretype = ScoreType::Lowerbound;
+
+                                keep_state = true
+                            }
+                            _ => match token.parse::<i32>() {
+                                Ok(score_mate) => self.score = Score::Mate(score_mate),
+                                _ => return parse_number_error(token),
+                            },
                         },
                         ParsingState::Currmove => {
                             self.currmove.set(token);
@@ -648,7 +676,7 @@ impl AnalysisInfo {
 
                     // anything from key pv onwards should be added to pv
                     // otherwise switch back to parsing key
-                    if !pv_on {
+                    if (!pv_on) && (!keep_state) {
                         ps = ParsingState::Key;
                     }
                 }
