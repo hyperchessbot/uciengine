@@ -8,6 +8,6 @@ git commit -m "%*"
 
 pause
 
-git push origin analysis
+git push origin master
 
-git push gitlab analysis
+git push gitlab master
