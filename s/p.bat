@@ -1,6 +1,6 @@
-call meta\b
+call s\b
 
-python meta\gen.py
+python s\gen.py
 
 git add . -A
 

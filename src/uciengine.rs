@@ -1,5 +1,7 @@
 use log::{debug, error, info, log_enabled, Level};
 
+use envor::envor::env_true;
+
 use std::collections::HashMap;
 use std::process::Stdio;
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
@@ -353,12 +355,19 @@ impl UciEngine {
             let ai = ai_clone;
             let atx = atx_clone;
 
+            let test_parse_info = env_true("TEST_PARSE_INFO");
+            let mut num_lines: usize = 0;
+            let mut ok_lines: usize = 0;
+            let mut failed_lines: usize = 0;
+
             loop {
                 match reader.next_line().await {
                     Ok(line_opt) => {
                         if let Some(line) = line_opt {
+                            num_lines += 1;
+
                             if log_enabled!(Level::Debug) {
-                                debug!("uci engine out : {}", line);
+                                debug!("uci engine out ( {} ) : {}", num_lines, line);
                             }
 
                             let mut is_bestmove = line.len() >= 8;
@@ -379,9 +388,25 @@ impl UciEngine {
                                 debug!("parse result {:?} , ai {:?}", parse_result, ai);
 
                                 if parse_result.is_ok() {
+                                    ok_lines += 1;
+
                                     let send_result = atx.send(*ai);
 
                                     debug!("send ai result {:?}", send_result);
+                                } else {
+                                    failed_lines += 1;
+
+                                    println!(
+                                        "parsing failed on {} with error {:?}",
+                                        line, parse_result
+                                    );
+                                }
+
+                                if test_parse_info {
+                                    println!(
+                                        "read {} , parsed ok {} , failed {}",
+                                        num_lines, ok_lines, failed_lines
+                                    );
                                 }
                             }
 
