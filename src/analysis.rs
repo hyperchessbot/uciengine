@@ -9,8 +9,8 @@ use thiserror::Error;
 /// InfoParseError captures possible info parsing errors
 #[derive(Error, Debug)]
 pub enum InfoParseError {
-    #[error("could not parse number for key '{0}' from info")]
-    ParseNumberError(String),
+    #[error("could not parse info number for state '{0:?}' from '{1}'")]
+    ParseNumberError(ParsingState, String),
     #[error("invalid info key '{0}'")]
     InvalidKeyError(String),
     #[error("invalid score specifier '{0}'")]
@@ -25,10 +25,10 @@ pub fn info_parse_error(err: InfoParseError) -> Result<(), InfoParseError> {
 }
 
 /// log parse number error and return it as a result
-pub fn parse_number_error<T: AsRef<str>>(key: T) -> Result<(), InfoParseError> {
-    let key = key.as_ref().to_string();
+pub fn parse_number_error<T: AsRef<str>>(ps: ParsingState, value: T) -> Result<(), InfoParseError> {
+    let value = value.as_ref().to_string();
 
-    info_parse_error(InfoParseError::ParseNumberError(key))
+    info_parse_error(InfoParseError::ParseNumberError(ps, value))
 }
 
 /// generate string buffer with given name and size
@@ -581,23 +581,23 @@ impl AnalysisInfo {
                     match ps {
                         ParsingState::Depth => match token.parse::<usize>() {
                             Ok(depth) => self.depth = depth,
-                            _ => return parse_number_error(token),
+                            _ => return parse_number_error(ps, token),
                         },
                         ParsingState::Seldepth => match token.parse::<usize>() {
                             Ok(seldepth) => self.seldepth = seldepth,
-                            _ => return parse_number_error(token),
+                            _ => return parse_number_error(ps, token),
                         },
                         ParsingState::Time => match token.parse::<usize>() {
                             Ok(time) => self.time = time,
-                            _ => return parse_number_error(token),
+                            _ => return parse_number_error(ps, token),
                         },
                         ParsingState::Nodes => match token.parse::<u64>() {
                             Ok(nodes) => self.nodes = nodes,
-                            _ => return parse_number_error(token),
+                            _ => return parse_number_error(ps, token),
                         },
                         ParsingState::Multipv => match token.parse::<usize>() {
                             Ok(multipv) => self.multipv = multipv,
-                            _ => return parse_number_error(token),
+                            _ => return parse_number_error(ps, token),
                         },
                         ParsingState::ScoreCp => match token {
                             "upperbound" => {
@@ -612,7 +612,7 @@ impl AnalysisInfo {
                             }
                             _ => match token.parse::<i32>() {
                                 Ok(score_cp) => self.score = Score::Cp(score_cp),
-                                _ => return parse_number_error(token),
+                                _ => return parse_number_error(ps, token),
                             },
                         },
                         ParsingState::ScoreMate => match token {
@@ -628,7 +628,7 @@ impl AnalysisInfo {
                             }
                             _ => match token.parse::<i32>() {
                                 Ok(score_mate) => self.score = Score::Mate(score_mate),
-                                _ => return parse_number_error(token),
+                                _ => return parse_number_error(ps, token),
                             },
                         },
                         ParsingState::Currmove => {
@@ -638,23 +638,23 @@ impl AnalysisInfo {
                         }
                         ParsingState::Currmovenumber => match token.parse::<usize>() {
                             Ok(currmovenumber) => self.currmovenumber = currmovenumber,
-                            _ => return parse_number_error(token),
+                            _ => return parse_number_error(ps, token),
                         },
                         ParsingState::Hashfull => match token.parse::<usize>() {
                             Ok(hashfull) => self.hashfull = hashfull,
-                            _ => return parse_number_error(token),
+                            _ => return parse_number_error(ps, token),
                         },
                         ParsingState::Nps => match token.parse::<u64>() {
                             Ok(nps) => self.nps = nps,
-                            _ => return parse_number_error(token),
+                            _ => return parse_number_error(ps, token),
                         },
                         ParsingState::Tbhits => match token.parse::<u64>() {
                             Ok(tbhits) => self.tbhits = tbhits,
-                            _ => return parse_number_error(token),
+                            _ => return parse_number_error(ps, token),
                         },
                         ParsingState::Cpuload => match token.parse::<usize>() {
                             Ok(cpuload) => self.cpuload = cpuload,
-                            _ => return parse_number_error(token),
+                            _ => return parse_number_error(ps, token),
                         },
                         ParsingState::PvBestmove => {
                             pv_buff = pv_buff + token;

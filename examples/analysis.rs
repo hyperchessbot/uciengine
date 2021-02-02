@@ -35,4 +35,20 @@ fn main() {
     if let Ok(json) = ai.to_json() {
         println!("ai as json {}", json);
     }
+
+    let result = ai.parse("info depth x");
+
+    println!("{:?}", result);
+
+    let result = ai.parse("info score celsius 10");
+
+    println!("{:?}", result);
+
+    let result = ai.parse("info depth 3 score lowerbound cp 4 hashfull 999");
+
+    println!("{:?} , {:?}", ai, result);
+
+    let result = ai.parse("info depth 3 score lowerbound cp 4 customkey 124 hashfull 999");
+
+    println!("{:?} , {:?}", ai, result);
 }
