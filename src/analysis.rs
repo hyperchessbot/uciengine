@@ -1,5 +1,7 @@
 use log::{error, warn};
 
+use envor::envor::env_true;
+
 use serde::{Deserialize, Serialize};
 
 use thiserror::Error;
@@ -499,6 +501,8 @@ impl AnalysisInfo {
         let mut pv_buff = String::new();
         let mut pv_on = false;
 
+        let allow_unknown_key = env_true("ALLOW_UNKNOWN_INFO_KEY");
+
         for token in info.split(" ") {
             match ps {
                 ParsingState::Info => {
@@ -540,9 +544,13 @@ impl AnalysisInfo {
                         "tbhits" => ParsingState::Tbhits,
                         "cpuload" => ParsingState::Cpuload,
                         "pv" => ParsingState::PvBestmove,
-                        // don't hang parsing at unknown token for the moment
-                        // TODO: consider making this an error
-                        _ => ParsingState::Unknown,
+                        _ => {
+                            if allow_unknown_key {
+                                ParsingState::Unknown
+                            } else {
+                                return Err(InfoParseError::InvalidKeyError(token.to_string()));
+                            }
+                        }
                     };
 
                     if let ParsingState::Score = ps {
