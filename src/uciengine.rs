@@ -3,6 +3,7 @@ use log::{debug, error, info, log_enabled, Level};
 use envor::envor::env_true;
 
 use std::collections::HashMap;
+use std::fmt::Display;
 use std::process::Stdio;
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
 use tokio::process::Command;
@@ -295,16 +296,21 @@ pub struct UciEngine {
 
 /// uci engine implementation
 impl UciEngine {
+    pub fn new(path: impl Display) -> std::sync::Arc<UciEngine> {
+        Self::new_with_args(path, &[] as &[&str])
+    }
+
     /// create new uci engine
-    pub fn new<T>(path: T) -> std::sync::Arc<UciEngine>
+    pub fn new_with_args<T>(path: T, args: &[impl ToString]) -> std::sync::Arc<UciEngine>
     where
-        T: core::fmt::Display,
+        T: core::fmt::Display
     {
         // you can use anything that can be converted to string as path
         let path = path.to_string();
 
         // spawn engine process
         let mut child = Command::new(path.as_str())
+            .args(args.iter().map(|s| s.to_string()))
             .stdout(Stdio::piped())
             .stdin(Stdio::piped())
             .spawn()
